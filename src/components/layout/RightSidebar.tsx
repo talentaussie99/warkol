@@ -27,6 +27,7 @@ interface RightSidebarProps {
   isEditingStatus: boolean;
   setIsEditingStatus: (v: boolean) => void;
   setUserName: (v: string) => void;
+  handleNameChange: (newName: string) => void;
   setUserStatus: (v: string) => void;
   setUserAvatar: (v: string) => void;
   setIsLoggedIn: (v: boolean) => void;
@@ -63,6 +64,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
   isEditingStatus,
   setIsEditingStatus,
   setUserName,
+  handleNameChange,
   setUserStatus,
   setUserAvatar,
   setIsLoggedIn,
@@ -74,6 +76,54 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
   pengunjung,
   mobileActiveTab
 }) => {
+  const [localEditName, setLocalEditName] = React.useState(userName);
+  const [localEditStatus, setLocalEditStatus] = React.useState(userStatus);
+
+  React.useEffect(() => {
+    if (isEditingName) setLocalEditName(userName);
+  }, [isEditingName, userName]);
+
+  React.useEffect(() => {
+    if (isEditingStatus) setLocalEditStatus(userStatus);
+  }, [isEditingStatus, userStatus]);
+
+  // handle user changing their name with limits
+  const handleNameSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (localEditName.trim() === "") return;
+    if (localEditName.trim() === userName) {
+      setIsEditingName(false);
+      return;
+    }
+    
+    // Check 7-day limits from visitors data
+    const myData = pengunjung.find(p => p.name === userName);
+    if (myData && myData.name_changes) {
+      const now = Date.now();
+      const last7Days = myData.name_changes.filter((dateStr: string) => {
+        return now - new Date(dateStr).getTime() < 7 * 24 * 60 * 60 * 1000;
+      });
+      if (last7Days.length >= 3) {
+        alert(_t("Ganti nama maksimal 3x dalam 7 hari kawan!", "Name changes limited to 3 times per 7 days buddy!"));
+        setLocalEditName(userName);
+        setIsEditingName(false);
+        return;
+      }
+    }
+
+    // In App.tsx we inject this wrapper via handleNameChange prop
+    handleNameChange(localEditName.trim());
+    setIsEditingName(false);
+  };
+
+  const handleStatusSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (localEditStatus.trim() === "") return;
+    
+    setUserStatus(localEditStatus.trim());
+    setIsEditingStatus(false);
+  };
+
   return (
     <div id="right-column" className={`${mobileActiveTab === "profile" ? "flex" : "hidden"} lg:flex lg:col-span-3 flex-col gap-4 overflow-y-auto warkop-scrollbar pr-1 h-full`}>
       {/* 1. USER PROFILE CARD */}
@@ -123,14 +173,14 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                   </div>
                   {isEditingName ? (
                     <form 
-                      onSubmit={(e) => { e.preventDefault(); setIsEditingName(false); }}
+                      onSubmit={handleNameSubmit}
                       className="flex items-center gap-1"
                     >
                       <input
                         type="text"
                         maxLength={15}
-                        value={userName}
-                        onChange={(e) => setUserName(e.target.value || _t("Kamu (Nongkrong)", "You (Hanging out)"))}
+                        value={localEditName}
+                        onChange={(e) => setLocalEditName(e.target.value)}
                         className="bg-stone-900 border border-[#44382C] text-xs px-2 py-0.5 rounded text-[#E0E0E0] w-full focus:outline-none focus:ring-1 focus:ring-amber-500 font-sans"
                         autoFocus
                       />
@@ -150,17 +200,14 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
 
                   {isEditingStatus ? (
                     <form
-                      onSubmit={(e) => {
-                        e.preventDefault();
-                        setIsEditingStatus(false);
-                      }}
+                      onSubmit={handleStatusSubmit}
                       className="flex items-center gap-1 mt-1"
                     >
                       <input
                         type="text"
                         maxLength={35}
-                        value={userStatus}
-                        onChange={(e) => setUserStatus(e.target.value)}
+                        value={localEditStatus}
+                        onChange={(e) => setLocalEditStatus(e.target.value)}
                         className="bg-stone-900 border border-[#44382C] text-xs px-2 py-0.5 rounded text-[#E0E0E0] w-full focus:outline-none focus:ring-1 focus:ring-amber-500 font-sans"
                         autoFocus
                         placeholder="Ketikan status kustom..."

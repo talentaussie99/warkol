@@ -59,6 +59,8 @@ export default function App() {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userName, setUserName] = useState("Kamu (Nongkrong)");
+  const [nameChanges, setNameChanges] = useState<string[]>([]);
+  const [userId, setUserId] = useState<string>("");
   const [userPin, setUserPin] = useState<string>(() => {
     const chars = "0123456789ABCDEF";
     let pinStr = "";
@@ -196,13 +198,42 @@ export default function App() {
       }
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (session?.user) {
-        setIsLoggedIn(true);
+        setUserId(session.user.id);
         const email = session.user.email || "";
         const parts = email.split("@")[0];
-        const nick = parts.replace(/[^a-zA-Z0-9]/g, "_").slice(0, 15) || "Kang_Kopi";
-        setUserName(nick);
+        const defaultNick = parts.replace(/[^a-zA-Z0-9]/g, "_").slice(0, 15) || "Kang_Kopi";
+        
+        // Fetch saved saldo, hunger, thirst, inventory for this user
+        // Migrate to session.user.id if needed
+        let fetchId = session.user.id;
+        let { data } = await supabase.from("pengunjung").select("name, status, avatar, name_changes, saldo, hunger, thirst, inventory").eq("id", fetchId).single();
+        
+        if (!data) {
+           // Fallback attempt migration from old email-based ID
+           const { data: oldData } = await supabase.from("pengunjung").select("name, status, avatar, name_changes, saldo, hunger, thirst, inventory").eq("id", `visitor-${defaultNick}`).single();
+           if (oldData) data = oldData;
+        }
+
+        if (data) {
+          if (data.name) setUserName(data.name);
+          else setUserName(defaultNick);
+          
+          if (data.status) setUserStatus(data.status);
+          if (data.avatar) setUserAvatar(data.avatar);
+          if (data.name_changes) setNameChanges(data.name_changes);
+          
+          setSaldo(data.saldo ?? 20000);
+          setHunger(data.hunger ?? 100);
+          setThirst(data.thirst ?? 100);
+          setFoodInventory(data.inventory ?? []);
+        } else {
+          setUserName(defaultNick);
+        }
+
+        setIsLoggedIn(true);
+
         if (!localStorage.getItem("tutorial_done")) {
           setShowTutorial(true);
         }
@@ -423,7 +454,11 @@ export default function App() {
           status: p.status,
           isOnline: p.is_online,
           table: p.table_id || "santai",
-          pin: p.pin
+          pin: p.pin,
+          saldo: p.saldo ?? 20000,
+          hunger: p.hunger ?? 100,
+          thirst: p.thirst ?? 100,
+          inventory: p.inventory ?? []
         })));
       }
     };
@@ -442,36 +477,57 @@ export default function App() {
     };
   }, []);
 
+  // Sync player stats to DB
+  useEffect(() => {
+    if (!isLoggedIn || !userId) return;
+    const syncStats = async () => {
+      await supabase.from("pengunjung").update({
+        saldo,
+        hunger,
+        thirst,
+        inventory: foodInventory
+      }).eq("id", userId);
+    };
+    // Debounce stat syncing to avoid spamming the DB on rapid updates
+    const timeout = setTimeout(syncStats, 1000);
+    return () => clearTimeout(timeout);
+  }, [saldo, hunger, thirst, foodInventory, isLoggedIn, userId]);
+
   // Register or update our visitor card
   useEffect(() => {
-    if (!isLoggedIn || !userName) return;
+    if (!isLoggedIn || !userId) return;
 
     const upsertVisitor = async () => {
       await supabase.from("pengunjung").upsert({
-        id: `visitor-${userName}`,
+        id: userId,
         name: userName,
         status: userStatus,
+        avatar: userAvatar,
+        name_changes: nameChanges,
         is_online: true,
         table_id: activeTableId,
         pin: userPin,
+        saldo: saldo,
+        hunger: hunger,
+        thirst: thirst,
+        inventory: foodInventory,
         last_active_at: new Date().toISOString()
-      });
+      }, { onConflict: 'id' });
     };
 
     upsertVisitor();
 
     // Mark offline on unmount/unload
     const handleUnload = async () => {
-      await supabase.from("pengunjung").update({ is_online: false }).eq("id", `visitor-${userName}`);
+      await supabase.from("pengunjung").update({ is_online: false }).eq("id", userId);
     };
 
     window.addEventListener("beforeunload", handleUnload);
-
     return () => {
       window.removeEventListener("beforeunload", handleUnload);
       handleUnload();
     };
-  }, [isLoggedIn, userName, userStatus, activeTableId, userPin]);
+  }, [isLoggedIn, userId, userName, userStatus, userAvatar, activeTableId, userPin, nameChanges]);
 
   // Synchronize mainView with mobileActiveTab for chess integration
   useEffect(() => {
@@ -520,15 +576,21 @@ export default function App() {
     return true;
   };
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoggingIn(true);
-    // Simulate API call
-    setTimeout(() => {
-      setIsLoggedIn(true);
-      setIsLoggingIn(false);
-      // Reset some states if needed
-    }, 1000);
+    
+    // Fallback if needed, but the auth listener handles actual state
+    const { data } = await supabase.from("pengunjung").select("saldo, hunger, thirst, inventory").eq("id", userId).single();
+    if (data) {
+      setSaldo(data.saldo ?? 20000);
+      setHunger(data.hunger ?? 100);
+      setThirst(data.thirst ?? 100);
+      setFoodInventory(data.inventory ?? []);
+    }
+
+    setIsLoggedIn(true);
+    setIsLoggingIn(false);
   };
 
   const getDisplaySender = (senderName: string): string => {
@@ -579,7 +641,7 @@ export default function App() {
   
   // Realtime clock
   const [currentTime, setCurrentTime] = useState("");
-  const [nongkrongCount, setNongkrongCount] = useState(127);
+  const nongkrongCount = pengunjung.filter(p => p.isOnline).length;
 
   // Chat scroll container ref
   const chatContainerRef = useRef<HTMLDivElement>(null);
@@ -644,17 +706,6 @@ export default function App() {
     };
   }, [userName, userPin]);
 
-  // Update visitors count slightly to feel alive
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setNongkrongCount(prev => {
-        const delta = Math.floor(Math.random() * 3) - 1; // -1, 0, or +1
-        const next = prev + delta;
-        return next > 100 && next < 150 ? next : prev;
-      });
-    }, 15000);
-    return () => clearInterval(interval);
-  }, []);
 
   // Active session timer
   useEffect(() => {
@@ -1325,7 +1376,7 @@ export default function App() {
   };
 
   const getActiveTable = (): Meja => {
-    return tables.find(m => m.id === activeTableId) || tables[0];
+    return tables.find(m => m.id === activeTableId) || tables[0] || INITIAL_MEJA_LIST[0];
   };
 
   const visibleTables = tables.filter((table) => {
@@ -2641,6 +2692,10 @@ export default function App() {
           isEditingStatus={isEditingStatus}
           setIsEditingStatus={setIsEditingStatus}
           setUserName={setUserName}
+          handleNameChange={(newName) => {
+            setUserName(newName);
+            setNameChanges(prev => [...prev, new Date().toISOString()]);
+          }}
           setUserStatus={setUserStatus}
           setUserAvatar={setUserAvatar}
           setIsLoggedIn={setIsLoggedIn}
@@ -2967,17 +3022,34 @@ export default function App() {
                   <h4 className="font-bold text-red-400 mb-1">{_t("Zona Berbahaya - Pengaturan Akun", "Danger Zone - Account Settings")}</h4>
                   <p className="text-red-400/80 mb-3">{_t("Penghapusan akun bersifat permanen (untuk simulasi ini). Semua pesan, riwayat kantong inventory, status, dan statistik lapar/haus akan hilang selamanya.", "Account deletion is permanent. All messages, inventory records, status, and hunger/thirst statistics will be lost forever.")}</p>
                   
-                  <div className="p-3 bg-red-950/20 border border-red-900/30 rounded-lg">
-                    <p className="font-bold text-stone-200 text-xs mb-2">{_t("Tindakan:", "Action:")}</p>
+                  <div className="p-3 bg-red-950/20 border border-red-900/30 rounded-lg space-y-3">
+                    <p className="font-bold text-stone-200 text-xs">{_t("Tindakan:", "Action:")}</p>
+                    
                     <button
-                      onClick={() => {
+                      onClick={async () => {
+                        if (confirm(_t("Yakin kawan mau keluar? Kasbonan kamu masih saya catat lho.", "Are you sure you want to log out? We'll keep your tab open."))) {
+                          await supabase.from("pengunjung").update({ is_online: false }).eq("id", userId);
+                          await supabase.auth.signOut();
+                          window.location.reload();
+                        }
+                      }}
+                      className="bg-amber-950 hover:bg-amber-900 text-amber-200 border border-amber-800 px-3 py-1.5 rounded text-[10px] uppercase font-bold tracking-wider transition-colors w-full sm:w-auto"
+                    >
+                      🚪 {_t("KELUAR (LOGOUT)", "LOG OUT")}
+                    </button>
+
+                    <br/>
+
+                    <button
+                      onClick={async () => {
                         if (confirm(_t("Yakin hapus akun? Semua data simulasi akan lenyap.", "Are you sure you want to delete your account? All simulated data will vanish."))) {
-                          // Dummy reset logic
+                          await supabase.from("pengunjung").delete().eq("id", userId);
+                          await supabase.auth.signOut();
                           localStorage.clear();
                           window.location.reload();
                         }
                       }}
-                      className="bg-red-950 hover:bg-red-900 text-red-200 border border-red-800 px-3 py-1.5 rounded text-[10px] uppercase font-bold tracking-wider transition-colors"
+                      className="bg-red-950 hover:bg-red-900 text-red-200 border border-red-800 px-3 py-1.5 rounded text-[10px] uppercase font-bold tracking-wider transition-colors w-full sm:w-auto"
                     >
                       🗑️ {_t("HAPUS AKUN SAYA", "DELETE MY ACCOUNT")}
                     </button>

@@ -37,6 +37,12 @@ export interface Pengunjung {
   isOnline: boolean;
   table?: string;
   pin?: string;
+  saldo?: number;
+  hunger?: number;
+  thirst?: number;
+  inventory?: any[];
+  avatar?: string;
+  name_changes?: string[]; // Array of ISO timestamp strings
 }
 
 export interface Notification {
