@@ -16,7 +16,8 @@ import {
   ChevronRight,
   Sparkles,
   Swords,
-  Flag
+  Flag,
+  DollarSign
 } from "lucide-react";
 
 const SOLID_PIECES: Record<string, string> = {
@@ -137,7 +138,8 @@ interface ChessBoardProps {
   userPin?: string;
   pengunjung?: any[];
   disabled?: boolean;
-  onWin?: (opponentType: "bot" | "user") => void;
+  onWin?: (opponentType: string) => void;
+  onChallengeSent?: (targetIdentifier: string) => void;
   acceptedChallengeOpponent?: {
     name: string;
     pin: string;
@@ -152,6 +154,7 @@ export default function ChessBoard({
   pengunjung = [],
   disabled = false, 
   onWin,
+  onChallengeSent,
   acceptedChallengeOpponent = null,
   onClearChallenge
 }: ChessBoardProps) {
@@ -175,6 +178,8 @@ export default function ChessBoard({
   const [showOpponentSelector, setShowOpponentSelector] = useState(false);
 
   const [banter, setBanter] = useState("Om Galon: Monggo mas jalannya, saya pegang Hitam!");
+  const [gameResult, setGameResult] = useState<'win' | 'loss' | 'draw' | null>(null);
+  const [hasClaimed, setHasClaimed] = useState(false);
 
   // Sync board representation from chess.js instance
   const board = game.board();
@@ -355,6 +360,7 @@ export default function ChessBoard({
             normalizedMsgFrom === activeOnlineOpponent.trim().toLowerCase()
           ) {
             setBanter(`🎉 @${msg.from} telah menyerah (resign)! Kamu memenangkan duel catur warkol ini!`);
+            setGameResult('win');
           }
           break;
         }
@@ -376,6 +382,8 @@ export default function ChessBoard({
     setSelectedSquare(null);
     setPossibleMoves([]);
     setGameHistory([]);
+    setGameResult(null);
+    setHasClaimed(false);
 
     if (gameMode === "MULTIPLAYER") {
       sendBroadcastMessage("CHESS_RESET", activeOnlineOpponent, {});
@@ -402,6 +410,7 @@ export default function ChessBoard({
 
     sendBroadcastMessage("CHESS_RESIGN", activeOnlineOpponent, {});
     setBanter(`🏳️ Kamu menyerah! Kemenangan untuk @${activeOnlineOpponent}.`);
+    setGameResult('loss');
   };
 
   // Undo Move
@@ -480,6 +489,7 @@ export default function ChessBoard({
     setIsWaitingAcceptance(true);
     setBanter(`✉️ Mengirim tantangan catur ke PIN [${target}]... Menunggu tanggapan.`);
     sendBroadcastMessage("CHESS_INVITE", target, {});
+    if (onChallengeSent) onChallengeSent(target);
     setShowOpponentSelector(false);
   };
 
@@ -567,6 +577,15 @@ export default function ChessBoard({
             setSelectedSquare(null);
             setPossibleMoves([]);
 
+            // Check game over
+            if (game.isGameOver()) {
+              if (game.isCheckmate()) {
+                setGameResult('win'); // User made the move and it's checkmate
+              } else {
+                setGameResult('draw');
+              }
+            }
+
             // If Multiplayer: Synchronize move to peer
             if (gameMode === "MULTIPLAYER") {
               sendBroadcastMessage("CHESS_MOVE", activeOnlineOpponent, {
@@ -582,7 +601,6 @@ export default function ChessBoard({
               } else if (game.isGameOver()) {
                 if (game.isCheckmate()) {
                   setBanter(activeBot.banters.checkmate);
-                  if (onWin) onWin("bot");
                 } else {
                   setBanter("Cak Lontong: Seri! Sama-sama kuat kayak pilar warung warkop.");
                 }
@@ -677,6 +695,14 @@ export default function ChessBoard({
           setFen(game.fen());
           setGameHistory(game.history());
           
+          if (game.isGameOver()) {
+            if (game.isCheckmate()) {
+              setGameResult('loss'); // Bot made the move and it's checkmate
+            } else {
+              setGameResult('draw');
+            }
+          }
+
           // AI banter feedback
           if (result.captured) {
             setBanter(activeBot.banters.capture[Math.floor(Math.random() * activeBot.banters.capture.length)]);
@@ -709,6 +735,24 @@ export default function ChessBoard({
       black: gameHistory[i + 1]
     });
   }
+
+  // Action buttons
+  const getBotReward = (botId: string) => {
+    switch (botId) {
+      case 'kopling': return '5.000';
+      case 'bakso': return '8.000';
+      case 'rt': return '10.000';
+      case 'galon': return '15.000';
+      default: return '2.000';
+    }
+  };
+
+  const handleClaim = () => {
+    if (onWin) {
+      onWin(gameMode === 'MULTIPLAYER' ? 'user' : activeBot.id);
+      setHasClaimed(true);
+    }
+  };
 
   return (
     <div id="catur-bapak-bapak" className="immersive-card p-3 sm:p-4 w-full relative overflow-hidden">
@@ -1030,9 +1074,35 @@ export default function ChessBoard({
           </div>
 
           {/* Action buttons */}
-          <div className="grid grid-cols-2 gap-1.5 mt-2">
-            <button
-              onClick={handleUndo}
+          <div className="mt-2 space-y-2">
+            { (isGameOver || gameResult) && (
+              <div className="space-y-1.5">
+                 {gameResult === 'win' && !hasClaimed && (
+                   <button 
+                     onClick={handleClaim}
+                     className="w-full py-1.5 bg-gradient-to-r from-amber-500 to-yellow-600 text-black font-black rounded-lg shadow-lg hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-1.5 text-[10px]"
+                   >
+                     <DollarSign size={12} />
+                     KLAIM HADIAH RP {gameMode === 'MULTIPLAYER' ? '5.000' : getBotReward(activeBot.id)}
+                   </button>
+                 )}
+
+                 <div className={`text-center py-1.5 rounded-lg border text-[10px] font-black tracking-widest uppercase shadow-inner ${
+                   gameResult === 'win' ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40' :
+                   gameResult === 'loss' ? 'bg-rose-500/20 text-rose-400 border-rose-500/40' :
+                   'bg-zinc-500/20 text-zinc-400 border-zinc-500/40'
+                 }`}>
+                   {gameResult === 'win' && "🏆 KAMU MENANG!"}
+                   {gameResult === 'loss' && "💀 KAMU KALAH!"}
+                   {gameResult === 'draw' && "🤝 REMIS / SERI!"}
+                   {!gameResult && isGameOver && (game.isCheckmate() ? "🏁 SKAKMAT!" : "🏁 GAME OVER!")}
+                 </div>
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-1.5">
+              <button
+                onClick={handleUndo}
               disabled={gameMode === "MULTIPLAYER" || gameHistory.length === 0 || isCpuThinking}
               title={gameMode === "MULTIPLAYER" ? "Fitur mundur tidak diizinkan saat duel!" : ""}
               className="py-1 px-2 border border-white/5 hover:bg-white/5 text-white/70 disabled:opacity-30 disabled:hover:bg-transparent rounded flex items-center justify-center gap-1 text-[11px] font-bold transition cursor-pointer"
@@ -1059,6 +1129,7 @@ export default function ChessBoard({
             )}
           </div>
         </div>
+      </div>
       </div>
     </div>
   );

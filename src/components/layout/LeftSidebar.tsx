@@ -106,7 +106,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
             onClick={() => setShowHowToOrder(true)}
             className="text-[8px] font-mono text-emerald-400 font-bold uppercase tracking-tighter bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors"
           >
-            {_t("Peraturan", "Rules")}
+            {_t("Peraturan & Fitur", "Rules & Features")}
           </button>
         </div>
 

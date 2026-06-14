@@ -210,90 +210,25 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                     </div>
                   )}
 
-                  {isEditingStatus ? (
-                    <form
-                      onSubmit={handleStatusSubmit}
-                      className="flex items-center gap-1 mt-1"
+                  {/* Status hidden as per user request */}
+                  <div className="flex items-center gap-1 mt-1 font-mono text-[9px] text-[#A69076]">
+                    <span>PIN:</span>
+                    <span 
+                      className="font-bold text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 px-1.5 py-0.2 rounded tracking-wider select-all cursor-pointer transition-colors"
+                      title={_t("Klik untuk salin PIN kawan", "Click to copy PIN")}
+                      onClick={() => {
+                        navigator.clipboard.writeText(userPin);
+                        /* Optional toast or status bubble update */
+                      }}
                     >
-                      <input
-                        type="text"
-                        maxLength={35}
-                        value={localEditStatus}
-                        onChange={(e) => setLocalEditStatus(e.target.value)}
-                        className="bg-stone-900 border border-[#44382C] text-xs px-2 py-0.5 rounded text-[#E0E0E0] w-full focus:outline-none focus:ring-1 focus:ring-amber-500 font-sans"
-                        autoFocus
-                        placeholder="Ketikan status kustom..."
-                      />
-                      <button
-                        type="submit"
-                        className="text-[10px] bg-[#D4A373] text-neutral-950 font-bold px-2 py-0.5 rounded cursor-pointer hover:bg-amber-400"
-                      >
-                        Sip
-                      </button>
-                    </form>
-                  ) : (
-                    <div className="flex flex-col gap-1 mt-0.5">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-[10px] text-zinc-350 font-sans italic leading-tight truncate block max-w-[110px]">
-                          {userStatus}
-                        </span>
-                        <button
-                          onClick={() => setIsEditingStatus(true)}
-                          className="text-[9px] bg-white/5 hover:bg-white/10 text-white/50 hover:text-white px-1 py-0.2 rounded border border-white/10 cursor-pointer transition-colors font-mono animate-fade-in"
-                          title="Tulis status sendiri kawan"
-                        >
-                          Tulis Sendiri
-                        </button>
-                      </div>
-                      
-                      {/* BBM-style PIN Profil component */}
-                      <div className="flex items-center gap-1 mt-1 font-mono text-[9px] text-[#A69076]">
-                        <span>PIN:</span>
-                        <span 
-                          className="font-bold text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 px-1.5 py-0.2 rounded tracking-wider select-all cursor-pointer transition-colors"
-                          title={_t("Klik untuk salin PIN kawan", "Click to copy PIN")}
-                          onClick={() => {
-                            navigator.clipboard.writeText(userPin);
-                            /* Optional toast or status bubble update */
-                          }}
-                        >
-                          {userPin}
-                        </span>
-                      </div>
-                    </div>
-                  )}
+                      {userPin}
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* Quick Status Selection */}
-            <div className="pt-2 border-t border-white/[0.03] space-y-1">
-              <span className="text-[8px] font-bold text-white/40 uppercase tracking-wider font-mono">Ubah Status Sesuai Vibe:</span>
-              <div className="flex flex-wrap gap-1">
-                {[
-                  "☕ Lagi Ngopi",
-                  "🍜 Makan Mie",
-                  "♟️ Main Catur Dulu",
-                  "🤯 Lagi Puyeng",
-                  "🚬 Butuh Sebat"
-                ].map((status) => (
-                  <button
-                    key={status}
-                    onClick={() => {
-                      handleUpdateStatus(status);
-                      setIsEditingStatus(false);
-                    }}
-                    className={`text-[9.5px] px-2 py-0.5 rounded font-sans transition-all cursor-pointer ${
-                      userStatus === status 
-                        ? "bg-amber-500/15 text-amber-300 border border-amber-500/20" 
-                        : "bg-[#1E1A16] text-[#C19262] hover:bg-amber-950/20 hover:text-white border border-white/5"
-                    }`}
-                  >
-                    {status}
-                  </button>
-                ))}
-              </div>
-            </div>
+            {/* Quick Status Selection hidden as per user request */}
 
             {/* Online duration readout */}
             <div className="bg-black/25 rounded p-1.5 border border-white/[0.03] flex items-center justify-between text-[10px] font-mono text-zinc-400">
@@ -450,7 +385,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                   ? "text-emerald-400 bg-emerald-500/10 border-emerald-500/20 font-sans" 
                   : "text-stone-600 bg-black/20 border-white/5 font-sans"
               }`}>
-                {p.isOnline ? _t("Ngopi", "Here") : _t("Pulang", "Left")}
+                {p.isOnline ? _t("Nongkrong", "Here") : _t("Pulang", "Left")}
               </span>
             </div>
           ))}

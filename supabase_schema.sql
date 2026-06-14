@@ -141,6 +141,22 @@ ALTER TABLE pesan_chat REPLICA IDENTITY FULL;
 
 
 -- ===================================================
+-- 7. Tabel: MESSAGE_REPORTS
+-- ===================================================
+CREATE TABLE IF NOT EXISTS message_reports (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  message_id TEXT NOT NULL,
+  reporter_id TEXT,
+  reason TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE message_reports DISABLE ROW LEVEL SECURITY;
+CREATE POLICY "Public access reports" ON message_reports FOR ALL USING (true) WITH CHECK (true);
+ALTER TABLE message_reports REPLICA IDENTITY FULL;
+
+
+-- ===================================================
 -- INDEX UNTUK MENINGKATKAN KINERJA
 -- ===================================================
 CREATE INDEX IF NOT EXISTS idx_pengunjung_table_id ON pengunjung(table_id);
@@ -168,7 +184,7 @@ END $$;
 DO $$
 DECLARE
   t_name TEXT;
-  tables_to_add TEXT[] := ARRAY['meja', 'pengunjung', 'linimasa_posts', 'linimasa_comments', 'notifications', 'pesan_chat'];
+  tables_to_add TEXT[] := ARRAY['meja', 'pengunjung', 'linimasa_posts', 'linimasa_comments', 'notifications', 'pesan_chat', 'message_reports'];
 BEGIN
   FOREACH t_name IN ARRAY tables_to_add LOOP
     BEGIN

@@ -76,7 +76,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
         if (PRESET_AVATARS && PRESET_AVATARS.length > 0) {
           setUserAvatar(PRESET_AVATARS[0].value);
         }
-        setUserStatus(_t("☕ Lagi Ngopi", "☕ Having Coffee"));
+        setUserStatus(_t("☕ Lagi Nongkrong", "☕ Hanging Out"));
         setIsLoggedIn(true);
       } else if (authMode === "register") {
         if (password !== confirmPassword) {
@@ -317,6 +317,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({
             <div className="flex items-center gap-1">
               <span className="text-[#E9C46A]/80 animate-pulse">☕</span>
               <span>Warkol Online — Tempat Berbagi Cerita & Tawa</span>
+            </div>
+            <div className="text-[6.5px] uppercase tracking-widest text-stone-600 font-bold mt-1">
+              Soft Launching Versi 1.0 Beta
             </div>
           </div>
         </div>

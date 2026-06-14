@@ -79,7 +79,7 @@ export default function App() {
     return pinStr;
   });
   const [isEditingName, setIsEditingName] = useState(false);
-  const [userStatus, setUserStatus] = useState("☕ Lagi Ngopi");
+  const [userStatus, setUserStatus] = useState("☕ Lagi Nongkrong");
   const [isEditingStatus, setIsEditingStatus] = useState(false);
 
   const [activeTableId, setActiveTableId] = useState<string>(TableId.SANTAI);
@@ -144,7 +144,7 @@ export default function App() {
   const [purchaseConfirmItem, setPurchaseConfirmItem] = useState<MenuItem | null>(null);
   const [orderConfirmingId, setOrderConfirmingId] = useState<string | null>(null);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
-  const [settingsTab, setSettingsTab] = useState<"terms" | "privacy" | "account" | "lang" | "guide" | "support">("lang");
+  const [settingsTab, setSettingsTab] = useState<"terms" | "privacy" | "account" | "lang" | "guide" | "support" | "fitur">("lang");
   const [lang, setLang] = useState<"id" | "en">("id");
   const [activeMobileToast, setActiveMobileToast] = useState<any | null>(null);
 
@@ -251,7 +251,7 @@ export default function App() {
         } else if (!error) {
           // New user defaults - only set if it's truly a "not found" scenario, not a db error
           setUserName(defaultNick);
-          setUserStatus("☕ Lagi Ngopi");
+          setUserStatus("☕ Lagi Nongkrong");
           setSaldo(20000);
           setHunger(100);
           setThirst(100);
@@ -669,6 +669,33 @@ export default function App() {
       handleUnload();
     };
   }, [isLoggedIn, userId]);
+
+  // 7. Load report counts and listen live
+  useEffect(() => {
+    const fetchReportCounts = async () => {
+      const { data, error } = await supabase.from("message_reports").select("message_id");
+      if (!error && data) {
+        const counts: Record<string, number> = {};
+        data.forEach((r: any) => {
+          counts[r.message_id] = (counts[r.message_id] || 0) + 1;
+        });
+        setMessageReports(counts);
+      }
+    };
+
+    fetchReportCounts();
+
+    const channel = supabase
+      .channel("reports-db-live")
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "message_reports" }, () => {
+        fetchReportCounts();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   const handleNameChange = async (newName: string) => {
     const oldName = userName;
@@ -1382,6 +1409,20 @@ export default function App() {
     const originalMsg = newMsgText.trim();
     setNewMsgText("");
 
+    // Easter Egg: Minta Air Putih
+    if (originalMsg.toLowerCase() === "minta air putih") {
+      const today = new Date().toDateString();
+      const lastClaim = localStorage.getItem("last_water_easter_egg");
+      if (lastClaim !== today) {
+        setHunger(prev => Math.min(100, prev + 50));
+        setThirst(prev => Math.min(100, prev + 50));
+        localStorage.setItem("last_water_easter_egg", today);
+        alert("🥤 Segala puji bagi Tuhan! Bapak-bapak warkop ngasih kamu segelas air putih gratis. Lapar & Haus nambah 50%!");
+      } else {
+        alert("⚠️ Maaf kawan, jatah air putih gratis cuma 1x sehari. Besok lagi ya!");
+      }
+    }
+
     // Detect Mentions
     const mentions = originalMsg.match(/@([\w\d-]+)/g);
     const nowStampForNotif = new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
@@ -1469,9 +1510,59 @@ export default function App() {
     await supabase.from("pesan_chat").update({ is_withdrawn: true }).eq("id", msgId);
   };
 
+  const handleOnChallengeSent = async (targetIdentifier: string) => {
+    const targetUser = pengunjung.find(p => 
+      p.name.toLowerCase() === targetIdentifier.toLowerCase() || 
+      (p.pin && p.pin.toLowerCase() === targetIdentifier.toLowerCase())
+    );
+    
+    if (targetUser && targetUser.id !== userId) {
+       await supabase.from("notifications").insert({
+         id: `chess-${Date.now()}-${Math.floor(Math.random()*1000)}`,
+         type: "chess_challenge",
+         sender: userName,
+         sender_id: userPin,
+         recipient_id: targetUser.id,
+         post_id: "chess",
+         content: "⚔️ Menantang kamu berduel catur live!",
+         timestamp: currentTime.split(" ")[0] || new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }),
+         is_read: false
+       });
+    }
+  };
+
+  const handleChessChallengeFromNotification = async (notif: any) => {
+    const channel = new BroadcastChannel("warkop_chess_multiplayer");
+    channel.postMessage({
+      type: "CHESS_INVITE_RESPONSE",
+      from: userName,
+      senderPin: userPin,
+      to: notif.sender,
+      accepted: true
+    });
+    channel.close();
+
+    setAcceptedChessChallenge({
+      name: notif.sender,
+      pin: notif.sender_id || "",
+      color: "b" 
+    });
+
+    setMainView("chess");
+    setDashboardTab("obrolan");
+    
+    await supabase.from("notifications").update({ is_read: true }).eq("id", notif.id);
+  };
+
   // Order Virtual Drink & Food Logic
-  const handleChessWin = (opponentType: "bot" | "user") => {
-    const reward = opponentType === "bot" ? 2000 : 5000;
+  const handleChessWin = (opponentId: string) => {
+    let reward = 5000;
+    if (opponentId === "kopling") reward = 5000;
+    else if (opponentId === "bakso") reward = 8000;
+    else if (opponentId === "rt") reward = 10000;
+    else if (opponentId === "galon") reward = 15000;
+    else if (opponentId === "user") reward = 5000;
+
     setSaldo(s => s + reward);
     alert(_t(`🏆 Menang Catur! Kamu dapet Rp ${reward.toLocaleString("id-ID")}.`, `🏆 Chess Win! You got Rp ${reward.toLocaleString("id-ID")}.`));
   };
@@ -2691,12 +2782,16 @@ export default function App() {
 
                        return (
                         <div key={notif.id} className="p-3 bg-black/30 border border-white/5 rounded-xl flex items-start gap-3 hover:bg-white/5 transition-colors cursor-default group">
-                          <div className={`mt-1 p-2 rounded-lg flex items-center justify-center shrink-0 ${
+                           <div className={`mt-1 p-2 rounded-lg flex items-center justify-center shrink-0 ${
                             notif.type === 'like' ? 'bg-rose-500/10 text-rose-500' : 
                             notif.type === 'tag' ? 'bg-amber-500/10 text-amber-500 shadow-[0_0_10px_rgba(233,196,106,0.1)]' : 
+                            notif.type === 'chess_challenge' ? 'bg-emerald-500/10 text-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.1)]' :
                             'bg-blue-500/10 text-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.1)]'
                           }`}>
-                            {notif.type === 'like' ? <Heart size={14} fill="currentColor" /> : notif.type === 'tag' ? <AtSign size={14} /> : <MessageSquare size={14} fill="currentColor" />}
+                            {notif.type === 'like' ? <Heart size={14} fill="currentColor" /> : 
+                             notif.type === 'tag' ? <AtSign size={14} /> : 
+                             notif.type === 'chess_challenge' ? <Swords size={14} /> :
+                             <MessageSquare size={14} fill="currentColor" />}
                           </div>
                           <div className="flex-1 flex flex-col gap-1">
                             <p className="text-[11px] leading-relaxed">
@@ -2707,7 +2802,14 @@ export default function App() {
                             </p>
                             <div className="flex items-center justify-between">
                               <span className="text-[9px] font-mono text-stone-600 uppercase tracking-tight">{notif.timestamp}</span>
-                              {notif.type === 'tag' ? (
+                              {notif.type === 'chess_challenge' ? (
+                                <button 
+                                  onClick={() => handleChessChallengeFromNotification(notif as any)}
+                                  className="text-[9px] font-black text-emerald-500 hover:text-emerald-400 uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer flex items-center gap-1"
+                                >
+                                  {_t("TERIMA TANTANGAN", "ACCEPT")}
+                                </button>
+                              ) : notif.type === 'tag' ? (
                                 <button 
                                   onClick={() => jumpToMessage(notif.postId, notif.content)}
                                   className="text-[9px] font-black text-amber-500/80 hover:text-amber-400 uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer flex items-center gap-1"
@@ -2981,7 +3083,7 @@ export default function App() {
                          ? _t("Klik di sini untuk Join Tongkrongan & mulai ngobrol...", "Click here to Join and start chatting...")
                          : (hunger <= 10 || thirst <= 10)
                            ? _t("⚠️ Lapar/Haus ≤10%! Makan/minum di menu Sajian dulu...", "⚠️ Hunger/Thirst ≤10%! Eat/drink from Menu first...")
-                           : _t("Ngobrol bareng bapak-bapak: 'bakar obat nyamuk'...", "Chat with the guys: 'light up mosquito coil'...")
+                           : _t("Tulis aja yang mau diobrolin", "Just write what you want to talk about")
                      }
                      value={newMsgText}
                      onChange={(e) => {
@@ -3169,6 +3271,7 @@ export default function App() {
                   pengunjung={pengunjung} 
                   disabled={hunger <= 10 || thirst <= 10} 
                   onWin={(type) => handleChessWin(type)} 
+                  onChallengeSent={handleOnChallengeSent}
                   acceptedChallengeOpponent={acceptedChessChallenge}
                   onClearChallenge={() => setAcceptedChessChallenge(null)}
                 />
@@ -3334,6 +3437,12 @@ export default function App() {
                 🌐 {_t("Bahasa", "Language")}
               </button>
               <button
+                onClick={() => setSettingsTab("fitur")}
+                className={`px-3 py-1.5 rounded uppercase font-bold transition-colors ${settingsTab === "fitur" ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30" : "text-stone-400 hover:text-emerald-200"}`}
+              >
+                🚀 {_t("Fitur", "Features")}
+              </button>
+              <button
                 onClick={() => setSettingsTab("guide")}
                 className={`px-3 py-1.5 rounded uppercase font-bold transition-colors ${settingsTab === "guide" ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30" : "text-stone-400 hover:text-emerald-200"}`}
               >
@@ -3366,6 +3475,27 @@ export default function App() {
             </div>
 
             <div className="bg-black/30 p-3 rounded-lg border border-white/5 h-[300px] overflow-y-auto warkop-scrollbar text-[11px] text-stone-300 font-sans leading-relaxed">
+              {settingsTab === "fitur" && (
+                <div className="space-y-3 animate-fade-in pr-1">
+                  <h4 className="font-bold text-emerald-400 mb-2">{_t("Fitur-fitur Warkol Online:", "Warkol Online Features:")}</h4>
+                   {[
+                    { icon: "☕", title: _t("Obrolan Meja", "Table Chat"), desc: _t("Ngobrol santai real-time di berbagai meja dengan bapak-bapak lainnya.", "Real-time chill chat at various tables.") },
+                    { icon: "📸", title: _t("Papan Cerita", "Story Board"), desc: _t("Bagikan status dan foto harian ala media sosial.", "Social media-style daily status and photo sharing.") },
+                    { icon: "♟️", title: _t("Pojok Catur", "Chess Corner"), desc: _t("Tantang duel catur live vs warga lain atau bot.", "Live chess duel vs others or bots.") },
+                    { icon: "🛍️", title: _t("Sajian Hidangan", "Warkol Menu"), desc: _t("Beli kopi, gorengan, dsb untuk isi Lapar & Haus.", "Purchase snacks and coffee to refill stats.") },
+                    { icon: "🚩", title: _t("Laporkan Pesan", "Report Message"), desc: _t("Fitur lapor otomatis untuk obrolan gak santai.", "Auto-hidden reported messages.") },
+                    { icon: "💳", title: _t("Sistem Saldo", "Balance System"), desc: _t("Dapat kucuran dana tiap 30 menit online.", "Get funds every 30 minutes online.") }
+                   ].map((f, i) => (
+                    <div key={i} className="p-2 bg-white/5 border border-white/5 rounded-lg flex items-start gap-2.5">
+                      <span className="text-lg">{f.icon}</span>
+                      <div>
+                        <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-tight leading-none">{f.title}</p>
+                        <p className="text-[9px] text-stone-400 mt-1 leading-snug">{f.desc}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
               {settingsTab === "lang" && (
                 <div className="space-y-4">
                   <h4 className="font-bold text-[#E9C46A] mb-2">{_t("Pilih Bahasa Intermuka:", "Select Interface Language:")}</h4>
@@ -3670,7 +3800,7 @@ export default function App() {
                 onClick={() => {
                   setIsLoggedIn(true);
                   setUserName("Rifki (Demo)");
-                  setUserStatus("☕ Lagi Ngopi");
+                  setUserStatus("☕ Lagi Nongkrong");
                   setShowAuthRequiredAlert(false);
                 }}
                 className="flex-[1.5] py-1.5 px-3 bg-gradient-to-r from-amber-400 to-[#D4A373] hover:from-amber-350 hover:to-amber-550 rounded text-xs font-black text-neutral-950 transition-all cursor-pointer flex items-center justify-center gap-1 shadow-md"
@@ -3883,12 +4013,22 @@ export default function App() {
                   }
                   
                   // Standard report handling
-                  setMessageReports(prev => {
-                    const currentVal = prev[reportingMessage.id] || 0;
-                    const nextVal = currentVal + 1;
-                    return { ...prev, [reportingMessage.id]: nextVal };
-                  });
-                  setReportSuccessFeedback(true);
+                  if (reportingMessage) {
+                    supabase.from("message_reports").insert({
+                      message_id: reportingMessage.id,
+                      reporter_id: userId,
+                      reason: selectedReportReason
+                    }).then(({ error }) => {
+                       if (error) console.warn("Laporan gagal disimpan:", error.message);
+                    });
+                    
+                    setMessageReports(prev => {
+                      const currentVal = prev[reportingMessage.id] || 0;
+                      const nextVal = currentVal + 1;
+                      return { ...prev, [reportingMessage.id]: nextVal };
+                    });
+                    setReportSuccessFeedback(true);
+                  }
                 }}
                 className="space-y-4"
               >
@@ -3942,22 +4082,7 @@ export default function App() {
                     </button>
                   </div>
 
-                  {/* DEMO SHORTCUT BUTTON */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      // Instantly report 11 times so they can see the message hidden because reportCount > 10.
-                      setMessageReports(prev => {
-                        const currentVal = prev[reportingMessage.id] || 0;
-                        const nextVal = currentVal + 11; // Ensure it exceeds 10!
-                        return { ...prev, [reportingMessage.id]: nextVal };
-                      });
-                      setReportSuccessFeedback(true);
-                    }}
-                    className="py-1 bg-amber-950/50 hover:bg-amber-900/60 border border-amber-900/40 text-[9px] font-mono font-bold text-amber-300 rounded cursor-pointer transition-all text-center flex items-center justify-center gap-1"
-                  >
-                    <span>🧪 Simulator: Instan +11 Laporan (Biar Sembunyi)</span>
-                  </button>
+                  {/* (Simulator removed) */}
                 </div>
               </form>
             )}

@@ -47,7 +47,7 @@ export const Header: React.FC<HeaderProps> = ({
             onClick={onShowHowToOrder}
             className="text-[9px] bg-amber-500/20 text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded font-mono font-bold tracking-wider hover:bg-amber-500/30 transition-all active:scale-95 cursor-pointer"
           >
-            {_t("PERATURAN", "RULES")}
+            {_t("PERATURAN & FITUR", "RULES & FEATURES")}
           </button>
           
           {/* Center Info Status */}
