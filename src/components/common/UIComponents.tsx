@@ -15,21 +15,37 @@ export const PRESET_AVATARS = [
   { value: "♟️", label: "Pion Catur" }
 ];
 
-export const renderUserAvatar = (avatarVal: string, sizeClass: string = "w-8 h-8", extraStyles: string = "") => {
-  const isUrl = avatarVal.startsWith("http://") || avatarVal.startsWith("https://") || avatarVal.startsWith("/");
-  if (isUrl) {
-    return (
-      <img
-        src={avatarVal}
-        alt="User Avatar"
-        className={`${sizeClass} rounded-full object-cover border border-[#44382C] shadow-inner shadow-black/80 ${extraStyles}`}
-        referrerPolicy="no-referrer"
-      />
-    );
+export const renderUserAvatar = (nameOrAvatar: string, sizeClass: string = "w-8 h-8", extraStyles: string = "") => {
+  let name = nameOrAvatar || "?";
+  
+  // Fallback to "K" if a URL or image path is passed as dynamic avatar value
+  if (name.startsWith("http://") || name.startsWith("https://") || name.includes("/") || name.includes(".")) {
+    name = "K";
   }
+  
+  // Clean string to get clean initial (e.g., "Kamu (Nongkrong)" -> "K")
+  let cleanName = name.split(" ")[0].replace(/[^a-zA-Z0-9]/g, "");
+  if (!cleanName) cleanName = name.charAt(0);
+  const initial = cleanName ? cleanName.charAt(0).toUpperCase() : "?";
+
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  
+  const colors = [
+    "bg-[#4D3C2C] border-[#6b523c]/50 text-amber-200", 
+    "bg-[#362D24] border-[#4b3e32]/50 text-stone-300", 
+    "bg-[#5c4033] border-[#7d5645]/50 text-[#E9C46A]", 
+    "bg-[#2d4030] border-[#3e5942]/50 text-emerald-200",
+    "bg-[#1c2e3d] border-[#294257]/50 text-sky-200",
+    "bg-[#3d1c1c] border-[#572929]/50 text-rose-200",
+  ];
+  const colorClass = colors[Math.abs(hash) % colors.length];
+
   return (
-    <div className={`${sizeClass} rounded-full bg-[#362D24] border border-[#44382C] flex items-center justify-center text-sm shadow-inner shadow-black/80 select-none flex-shrink-0 ${extraStyles}`}>
-      {avatarVal}
+    <div className={`${sizeClass} rounded-full border flex items-center justify-center font-extrabold select-none flex-shrink-0 shadow-lg text-[11px] leading-none ${colorClass} ${extraStyles}`}>
+      {initial}
     </div>
   );
 };

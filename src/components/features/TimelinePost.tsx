@@ -51,13 +51,7 @@ export const TimelinePost: React.FC<TimelinePostProps> = ({
       {/* Post Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          {isSelf ? (
-            renderUserAvatar(userAvatar, "w-7 h-7", "border border-amber-500/25")
-          ) : (
-            <div className={`w-7 h-7 rounded-full ${post.avatarColor || "bg-[#E9C46A]"} text-neutral-900 font-extrabold flex items-center justify-center text-xs shadow`}>
-              {post.author ? post.author.charAt(0).toUpperCase() : "?"}
-            </div>
-          )}
+          {renderUserAvatar(post.author || userName, "w-7 h-7", "border border-amber-500/25")}
           <div className="flex flex-col">
             <span className="text-xs font-bold text-stone-200 font-sans">{post.author}</span>
             <span className="text-[9px] text-stone-500 font-mono mt-0.5">

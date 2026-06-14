@@ -86,7 +86,7 @@ export const Timeline: React.FC<TimelineProps> = ({
         <form onSubmit={handleCreatePost} className="p-3 bg-black/30 border border-white/5 rounded-xl flex flex-col gap-2.5 shadow-inner">
           <div className="flex items-start gap-2.5">
              <div className="shrink-0 mt-0.5">
-               {renderUserAvatar(userAvatar, "w-8 h-8", "ring-1 ring-white/10")}
+               {renderUserAvatar(userName, "w-8 h-8", "ring-1 ring-white/10")}
              </div>
              <textarea
                className="flex-1 bg-transparent border-none focus:ring-0 text-xs text-white placeholder-stone-600 font-sans resize-none min-h-[50px] py-1"

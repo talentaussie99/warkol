@@ -57,6 +57,7 @@ import { TutorialModal } from "./components/modals/TutorialModal";
 export default function App() {
   // Application State
   const [authMode, setAuthMode] = useState<"login" | "register" | "forgot">("login");
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userName, setUserName] = useState("Kamu (Nongkrong)");
@@ -198,11 +199,15 @@ export default function App() {
           setShowTutorial(true);
         }
       }
+      setIsAuthLoading(false);
+    }).catch(() => {
+      setIsAuthLoading(false);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (session?.user) {
         setUserId(session.user.id);
+        setIsLoggedIn(true);
         const email = session.user.email || "";
         const parts = email.split("@")[0];
         const defaultNick = parts.replace(/[^a-zA-Z0-9]/g, "_").slice(0, 15) || "Kang_Kopi";
@@ -234,14 +239,13 @@ export default function App() {
           setUserName(defaultNick);
         }
 
-        setIsLoggedIn(true);
-
         if (!localStorage.getItem("tutorial_done")) {
           setShowTutorial(true);
         }
       } else {
         setIsLoggedIn(false);
       }
+      setIsAuthLoading(false);
     });
 
     return () => subscription.unsubscribe();
@@ -376,20 +380,49 @@ export default function App() {
           });
         }
 
-        const mapped: LinimasaPost[] = postsData.map((p: any) => ({
-          id: p.id,
-          author: p.author,
-          avatarColor: p.avatar_color,
-          text: p.text,
-          image: p.image || undefined,
-          timestamp: p.timestamp,
-          createdAt: new Date(p.created_at).getTime(),
-          likes: p.likes || 0,
-          isLikedByUser: p.liked_by?.includes(userName) || false,
-          comments: commentsGrouped[p.id] || []
-        }));
+        const mapped: LinimasaPost[] = postsData.map((p: any) => {
+          const rawDate = p.created_at ? new Date(p.created_at).getTime() : Date.now();
+          return {
+            id: p.id,
+            author: p.author,
+            avatarColor: p.avatar_color,
+            text: p.text,
+            image: p.image || undefined,
+            timestamp: p.timestamp,
+            createdAt: isNaN(rawDate) ? Date.now() : rawDate,
+            likes: p.likes || 0,
+            isLikedByUser: p.liked_by?.includes(userName) || false,
+            comments: commentsGrouped[p.id] || []
+          };
+        });
 
-        setLinimasaPosts(mapped);
+        // Merge with existing local-only posts in localStorage (so they don't disappear)
+        let mergedList = [...mapped];
+        try {
+          const stored = localStorage.getItem("warkop_linimasa_posts");
+          if (stored) {
+            const parsed = JSON.parse(stored) as LinimasaPost[];
+            const now = Date.now();
+            const freshStored = parsed.filter(post => now - (post.createdAt || 0) < 24 * 60 * 60 * 1000);
+            
+            freshStored.forEach((localPost) => {
+              if (!mergedList.some((p) => p.id === localPost.id)) {
+                mergedList.push(localPost);
+              }
+            });
+          }
+        } catch (e) {
+          console.error("Error merging fallback posts:", e);
+        }
+
+        // Sort by createdAt descending
+        mergedList.sort((a, b) => b.createdAt - a.createdAt);
+
+        // Filter 24 hours
+        const now = Date.now();
+        const finalPosts = mergedList.filter(p => now - (p.createdAt || 0) < 24 * 60 * 60 * 1000);
+
+        setLinimasaPosts(finalPosts);
       }
     };
 
@@ -599,6 +632,8 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (isAuthLoading) return;
+
     let path = "/beranda";
     let search = "";
 
@@ -631,7 +666,7 @@ export default function App() {
     if (currentFull !== targetFull) {
       window.history.pushState(null, "", targetFull);
     }
-  }, [isLoggedIn, authMode, mainView, dashboardTab, activeTableId]);
+  }, [isAuthLoading, isLoggedIn, authMode, mainView, dashboardTab, activeTableId]);
 
   // Cooldown countdown effect
   useEffect(() => {
@@ -702,7 +737,29 @@ export default function App() {
   };
 
   // Linimasa (Timeline / Social Media Feed) states
-  const [linimasaPosts, setLinimasaPosts] = useState<LinimasaPost[]>([]);
+  const [linimasaPosts, setLinimasaPosts] = useState<LinimasaPost[]>(() => {
+    try {
+      const stored = localStorage.getItem("warkop_linimasa_posts");
+      if (stored) {
+        const parsed = JSON.parse(stored) as LinimasaPost[];
+        const now = Date.now();
+        return parsed.filter(post => now - (post.createdAt || 0) < 24 * 60 * 60 * 1000);
+      }
+    } catch (e) {
+      console.error("Error reading initial linimasa_posts from localStorage:", e);
+    }
+    return [];
+  });
+
+  useEffect(() => {
+    try {
+      const now = Date.now();
+      const freshPosts = linimasaPosts.filter(post => now - (post.createdAt || 0) < 24 * 60 * 60 * 1000);
+      localStorage.setItem("warkop_linimasa_posts", JSON.stringify(freshPosts));
+    } catch (e) {
+      console.error("Error writing linimasa_posts to localStorage:", e);
+    }
+  }, [linimasaPosts]);
   const [visiblePostsCount, setVisiblePostsCount] = useState(3);
   const [seeMoreClicks, setSeeMoreClicks] = useState(0);
 
@@ -940,6 +997,7 @@ export default function App() {
     if (!editingPostText.trim()) return;
 
     await supabase.from("linimasa_posts").update({ text: editingPostText }).eq("id", postId);
+    setLinimasaPosts(prev => prev.map(p => p.id === postId ? { ...p, text: editingPostText } : p));
     setEditingPostId(null);
     setEditingPostText("");
   };
@@ -989,6 +1047,7 @@ export default function App() {
     if (!isLoggedIn) return;
     if (window.confirm("Apakah kamu yakin ingin menghapus postingan ini, kawan? Cerita ini tidak akan bisa kembali lagi.")) {
       await supabase.from("linimasa_posts").delete().eq("id", postId);
+      setLinimasaPosts(prev => prev.filter(p => p.id !== postId));
     }
   };
 
@@ -2059,7 +2118,7 @@ export default function App() {
                   <form onSubmit={handleCreatePost} className="space-y-2 bg-[#171412] p-2.5 rounded-lg border border-white/5">
                     <div className="flex gap-2 items-start">
                       {/* User profile avatar */}
-                      {renderUserAvatar(userAvatar, "w-7 h-7", "shrink-0 border border-amber-500/20")}
+                      {renderUserAvatar(userName, "w-7 h-7", "shrink-0 border border-amber-500/20")}
                       
                       <div className="flex-1">
                         <textarea
@@ -2171,13 +2230,7 @@ export default function App() {
                           {/* Post Header */}
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
-                              {isSelf ? (
-                                renderUserAvatar(userAvatar, "w-7 h-7", "border border-amber-500/25")
-                              ) : (
-                                <div className={`w-7 h-7 rounded-full ${post.avatarColor || "bg-[#E9C46A]"} text-neutral-900 font-extrabold flex items-center justify-center text-xs shadow`}>
-                                  {post.author ? post.author.charAt(0).toUpperCase() : "?"}
-                                </div>
-                              )}
+                              {renderUserAvatar(post.author || userName, "w-7 h-7", "border border-amber-500/25")}
                               <div className="flex flex-col">
                                 <span className="text-xs font-bold text-stone-200 font-sans">{post.author}</span>
                                 <span className="text-[9px] text-stone-500 font-mono mt-0.5">
