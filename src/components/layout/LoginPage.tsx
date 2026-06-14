@@ -137,25 +137,25 @@ export const LoginPage: React.FC<LoginPageProps> = ({
       />
 
       {/* Form Container Panel */}
-      <div id="login-left-pane" className="col-span-12 md:col-span-5 h-[100dvh] md:h-full flex flex-col items-center justify-center p-4 xs:p-6 sm:p-8 relative z-10 bg-gradient-to-r from-black/95 via-black/50 to-transparent overflow-hidden">
-        <div className="w-full max-w-sm p-6 xs:p-8 sm:p-10 bg-black/60 backdrop-blur-xl md:backdrop-blur-2xl border border-white/10 shadow-[0_30px_70px_-15px_rgba(0,0,0,0.98)] rounded-[2rem] relative overflow-hidden ring-1 ring-white/15 animate-fade-in-up flex flex-col justify-between max-h-[94dvh] sm:max-h-none overflow-y-auto warkop-scrollbar">
+      <div id="login-left-pane" className="col-span-12 md:col-span-5 h-[100dvh] md:h-full flex flex-col items-center justify-center p-4 xs:p-6 sm:p-8 md:p-6 relative z-10 bg-gradient-to-r from-black/95 via-black/50 to-transparent overflow-hidden">
+        <div className="w-full max-w-sm p-6 xs:p-8 sm:p-10 md:p-7 bg-black/60 backdrop-blur-xl md:backdrop-blur-2xl border border-white/10 shadow-[0_30px_70px_-15px_rgba(0,0,0,0.98)] rounded-[2rem] relative overflow-hidden ring-1 ring-white/15 animate-fade-in-up flex flex-col justify-between max-h-[94dvh] md:max-h-[90dvh] overflow-y-auto warkop-scrollbar">
           
           <div className="absolute top-0 right-0 transform translate-x-4 -translate-y-4 w-32 h-32 bg-[#E9C46A]/10 rounded-full blur-3xl pointer-events-none"></div>
           
           {/* Logo & Subtitle */}
-          <div className="text-center mb-5 sm:mb-7 flex flex-col items-center shrink-0">
+          <div className="text-center mb-4 md:mb-3 flex flex-col items-center shrink-0">
             <img
               src="https://imgur.com/m16hDt0.jpg"
               alt="WARKOL Logo"
-              className="h-16 xs:h-20 sm:h-28 w-auto object-contain mb-3 animate-bounce [animation-duration:10s]"
+              className="h-16 xs:h-18 sm:h-24 md:h-20 w-auto object-contain mb-2 animate-bounce [animation-duration:10s]"
               referrerPolicy="no-referrer"
             />
 
-            <span className="text-[8px] sm:text-[9.5px] font-mono tracking-[0.12em] sm:tracking-[0.18em] font-black text-[#E9C46A] bg-amber-500/20 px-3 py-1 rounded-full border border-amber-500/30 inline-block uppercase select-none shadow-sm">
+            <span className="text-[8px] sm:text-[9px] md:text-[8px] font-mono tracking-[0.12em] font-black text-[#E9C46A] bg-amber-500/20 px-3 py-1 rounded-full border border-amber-500/30 inline-block uppercase select-none shadow-sm">
               ☕ Warkop Online Pertama di Indonesia
             </span>
 
-            <span className="mt-2 sm:mt-3 bg-red-600/90 text-white font-sans font-black text-[7.5px] sm:text-[8.5px] px-2 sm:px-3 py-1 rounded-md border border-red-500/40 tracking-wider uppercase shadow-[0_4px_12px_rgba(220,38,38,0.5)] select-none animate-pulse">
+            <span className="mt-1.5 sm:mt-2 bg-red-600/90 text-white font-sans font-black text-[7.5px] sm:text-[8px] px-2 sm:px-2.5 py-0.5 rounded-md border border-red-500/40 tracking-wider uppercase shadow-[0_4px_12px_rgba(220,38,38,0.5)] select-none animate-pulse">
               🔴 Buka 24 Jam
             </span>
           </div>
@@ -174,14 +174,14 @@ export const LoginPage: React.FC<LoginPageProps> = ({
           {/* MAIN DYNAMIC CONTENT */}
           <div className="space-y-3 sm:space-y-4 flex-1 flex flex-col justify-center">
             
-            {/* 1. Header Copywriting based on selected tab */}
-            <div className="text-center pb-1 sm:pb-2 shrink-0">
-              <h2 className="text-sm xs:text-base sm:text-lg font-black text-white leading-tight font-sans">
-                {authMode === "login" && _t("Masih ada kursi kosong nih,", "There's still an empty seat,")}
-                {authMode === "register" && _t("Sini pesen meja dulu, kawan,", "Get a table registered first, buddy,")}
-                {authMode === "forgot" && _t("Aduh lupa kunci meja ya?", "Forgot your keys, buddy?")}
-              </h2>
-              <p className="text-[8.5px] xs:text-[9.5px] sm:text-[10px] text-amber-500/80 font-mono mt-0.5 sm:mt-1 font-bold tracking-wider uppercase">
+          {/* 1. Header Copywriting based on selected tab */}
+          <div className="text-center pb-1 md:pb-0.5 shrink-0">
+            <h2 className="text-sm xs:text-base md:text-sm font-black text-white leading-tight font-sans">
+              {authMode === "login" && _t("Masih ada kursi kosong nih,", "There's still an empty seat,")}
+              {authMode === "register" && _t("Sini pesen meja dulu, kawan,", "Get a table registered first, buddy,")}
+              {authMode === "forgot" && _t("Aduh lupa kunci meja ya?", "Forgot your keys, buddy?")}
+            </h2>
+            <p className="text-[8.5px] xs:text-[9px] md:text-[8px] text-amber-500/80 font-mono mt-0.5 font-bold tracking-wider uppercase">
                 {authMode === "login" && _t("Yuk nyari temen ngobrol di warkol!", "Let's find friends to chat at our warkop!")}
                 {authMode === "register" && _t("Bikin akun dulu biar simpan saldo & kantong!", "Create an account to keep your wallet & data!")}
                 {authMode === "forgot" && _t("Jangan panik, bisa diatur lewat email!", "Don't panic, let's fix it via email!")}
@@ -189,11 +189,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({
             </div>
 
             {/* FORM CONTAINER */}
-            <form onSubmit={handleFormSubmit} className="space-y-2.5 sm:space-y-3.5">
+            <form onSubmit={handleFormSubmit} className="space-y-2 md:space-y-2.5">
               
               {/* EMAIL FIELD */}
-              <div className="space-y-1 sm:space-y-1.5">
-                <label className="text-[8.5px] sm:text-[10px] font-black text-stone-400 uppercase tracking-widest flex items-center gap-1 sm:gap-1.5 pl-1">
+              <div className="space-y-1 md:space-y-0.5">
+                <label className="text-[8.5px] md:text-[9px] font-black text-stone-400 uppercase tracking-widest flex items-center gap-1 sm:gap-1.5 pl-1">
                   <Mail size={10} className="text-amber-500" />
                   {authMode === "login" && _t("Tulis email dulu ya,", "Write down your email first,")}
                   {authMode === "register" && _t("Tulis email buatanmu ya,", "Fill in your registration email,")}
@@ -206,15 +206,15 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                     placeholder="contoh@gmail.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 rounded-2xl pl-4 pr-4 py-3 sm:py-3.5 text-xs sm:text-sm text-white placeholder-stone-600 focus:outline-none focus:ring-1 focus:ring-amber-500/50 focus:border-amber-500 transition-all font-sans font-semibold"
+                    className="w-full bg-white/5 border border-white/10 rounded-2xl pl-4 pr-4 py-3 sm:py-3.5 md:py-2.5 text-xs sm:text-sm md:text-xs text-white placeholder-stone-600 focus:outline-none focus:ring-1 focus:ring-amber-500/50 focus:border-amber-500 transition-all font-sans font-semibold"
                   />
                 </div>
               </div>
 
               {/* PASSWORD FIELD (Only on login or register) */}
               {authMode !== "forgot" && (
-                <div className="space-y-1 sm:space-y-1.5">
-                  <label className="text-[8.5px] sm:text-[10px] font-black text-stone-400 uppercase tracking-widest flex items-center gap-1 sm:gap-1.5 pl-1">
+                <div className="space-y-1 md:space-y-0.5">
+                  <label className="text-[8.5px] md:text-[9px] font-black text-stone-400 uppercase tracking-widest flex items-center gap-1 sm:gap-1.5 pl-1">
                     <Lock size={10} className="text-amber-500" />
                     <span>{_t("Isi sandi / password kawan", "Fill in password")}</span>
                   </label>
@@ -225,7 +225,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                       placeholder="••••••••"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 sm:py-3.5 text-xs sm:text-sm text-white placeholder-stone-600 focus:outline-none focus:ring-1 focus:ring-amber-500/50 focus:border-amber-500 transition-all font-sans"
+                      className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 sm:py-3.5 md:py-2.5 text-xs sm:text-sm md:text-xs text-white placeholder-stone-600 focus:outline-none focus:ring-1 focus:ring-amber-500/50 focus:border-amber-500 transition-all font-sans"
                     />
                   </div>
                 </div>
@@ -255,7 +255,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
               <button
                 type="submit"
                 disabled={simulatedLoading}
-                className="w-full mt-4 sm:mt-6 bg-[#E9C46A] hover:bg-amber-400 disabled:opacity-50 text-neutral-900 font-black py-3 sm:py-3.5 rounded-2xl transition-all shadow-md hover:shadow-lg hover:shadow-amber-500/10 active:scale-95 flex items-center justify-center gap-2 uppercase text-[10px] sm:text-[11px] tracking-[0.15em] group"
+                className="w-full mt-4 md:mt-3.5 bg-[#E9C46A] hover:bg-amber-400 disabled:opacity-50 text-neutral-900 font-black py-3 sm:py-3.5 md:py-2.5 rounded-2xl transition-all shadow-md hover:shadow-lg hover:shadow-amber-500/10 active:scale-95 flex items-center justify-center gap-2 uppercase text-[10px] md:text-[9.5px] tracking-[0.15em] group"
               >
                 {simulatedLoading ? (
                   <div className="w-3.5 h-3.5 border-2 border-neutral-950 border-t-transparent rounded-full animate-spin"></div>
@@ -313,7 +313,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
           </div>
 
           {/* Aesthetic footer */}
-          <div className="mt-4 sm:mt-6 pt-2 border-t border-white/5 text-center flex flex-col items-center justify-center gap-0.5 text-[#E9C46A]/30 font-mono text-[7px] sm:text-[8px] select-none shrink-0">
+          <div className="mt-4 md:mt-3 pt-2 border-t border-white/5 text-center flex flex-col items-center justify-center gap-0.5 text-[#E9C46A]/30 font-mono text-[7px] md:text-[7.5px] select-none shrink-0">
             <div className="flex items-center gap-1">
               <span className="text-[#E9C46A]/80 animate-pulse">☕</span>
               <span>Warkol Online — Tempat Berbagi Cerita & Tawa</span>
