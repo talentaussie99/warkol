@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS pengunjung (
   avatar TEXT,
   name_changes JSONB DEFAULT '[]'::jsonb,
   is_online BOOLEAN DEFAULT true,
-  table_id TEXT REFERENCES meja(id) ON DELETE SET NULL,
+  table_id TEXT,
   pin TEXT,
   saldo BIGINT DEFAULT 20000,
   hunger INTEGER DEFAULT 100,

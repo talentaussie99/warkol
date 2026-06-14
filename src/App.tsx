@@ -187,31 +187,6 @@ export default function App() {
 
   // --- SUPABASE REALTIME SYNCHRONIZATION ---
 
-  // Clean up legacy and active bot entries from the database to ensure strictly real users
-  useEffect(() => {
-    const cleanAllBots = async () => {
-      try {
-        const botNames = [
-          "Bang Bakso", "Om Galon", "Kang Pecel", "Bang Soto", "Om Lele", "Kang Bubur",
-          "Pak RT", "Mbah Kopi", "Cak Lontong", "Lek Kupat", "Pak RW", "Kang Siomay",
-          "Mas Batagor", "Mpok Jamu", "Bang Ojol", "Mas Gorengan", "Kang Gorengan",
-          "Bang bakso", "Om galon", "Kang pecel", "Bang soto", "Om lele", "Kang bubur",
-          "Pak Rt", "Mbah kopi", "Cak lontong", "Lek kupat", "Pak Rw", "Kang siomay",
-          "Mas batagor", "Mpok jamu", "Bang ojol", "Mas gorengan", "Kang gorengan",
-          "bang bakso", "om galon", "kang pecel", "bang soto", "om lele", "kang bubur",
-          "pak rt", "mbah kopi", "cak lontong", "lek kupat", "pak rw", "kang siomay",
-          "mas batagor", "mpok jamu", "bang ojol", "mas gorengan", "kang gorengan",
-          "PAK RT", "PAK RW", "KANG PECEL", "MAS GORENGAN"
-        ];
-        await supabase.from("pesan_chat").delete().in("sender", botNames);
-        await supabase.from("pengunjung").delete().in("name", botNames);
-      } catch (err) {
-        console.error("Error cleaning bots from database:", err);
-      }
-    };
-    cleanAllBots();
-  }, []);
-
   // 1. Authenticated session listener
   useEffect(() => {
     let active = true;
@@ -258,6 +233,7 @@ export default function App() {
           setThirst(data.thirst ?? 100);
           setFoodInventory(data.inventory ?? []);
         } else {
+          // New user defaults
           setUserName(defaultNick);
           setUserStatus("☕ Lagi Ngopi");
           setSaldo(20000);
@@ -405,7 +381,7 @@ export default function App() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [tables]);
+  }, [tables, userName]);
 
   // 4. Load linimasa_posts (with nested comments) and listen live
   useEffect(() => {
@@ -602,7 +578,7 @@ export default function App() {
       }
     };
 
-    const timeout = setTimeout(syncVisitorData, 800);
+    const timeout = setTimeout(syncVisitorData, 300);
     return () => clearTimeout(timeout);
   }, [
     isLoggedIn,
@@ -798,15 +774,8 @@ export default function App() {
     e.preventDefault();
     setIsLoggingIn(true);
     
-    // Fallback if needed, but the auth listener handles actual state
-    const { data } = await supabase.from("pengunjung").select("saldo, hunger, thirst, inventory").eq("id", userId).single();
-    if (data) {
-      setSaldo(data.saldo ?? 20000);
-      setHunger(data.hunger ?? 100);
-      setThirst(data.thirst ?? 100);
-      setFoodInventory(data.inventory ?? []);
-    }
-
+    // Login flow is primarily handled by onAuthStateChange listener
+    // We just trigger state which will be synced by the listener
     setIsLoggedIn(true);
     setIsLoggingIn(false);
   };
