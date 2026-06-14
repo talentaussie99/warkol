@@ -18,18 +18,14 @@ interface RightSidebarProps {
   thirst: number;
   isStatsExpanded: boolean;
   setIsStatsExpanded: (v: boolean) => void;
-  showAvatarSelector: boolean;
-  setShowAvatarSelector: (v: boolean) => void;
-  customAvatarInput: string;
-  setCustomAvatarInput: (v: string) => void;
   isEditingName: boolean;
   setIsEditingName: (v: boolean) => void;
   isEditingStatus: boolean;
   setIsEditingStatus: (v: boolean) => void;
   setUserName: (v: string) => void;
   handleNameChange: (newName: string) => void;
-  setUserStatus: (v: string) => void;
-  setUserAvatar: (v: string) => void;
+  handleUpdateStatus: (v: string) => void;
+  handleUpdateAvatar: (v: string) => void;
   setIsLoggedIn: (v: boolean) => void;
   inventory: MenuItem[];
   handleConsumeItem: (instanceId: string) => void;
@@ -55,18 +51,14 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
   thirst,
   isStatsExpanded,
   setIsStatsExpanded,
-  showAvatarSelector,
-  setShowAvatarSelector,
-  customAvatarInput,
-  setCustomAvatarInput,
   isEditingName,
   setIsEditingName,
   isEditingStatus,
   setIsEditingStatus,
   setUserName,
   handleNameChange,
-  setUserStatus,
-  setUserAvatar,
+  handleUpdateStatus,
+  handleUpdateAvatar,
   setIsLoggedIn,
   inventory,
   handleConsumeItem,
@@ -120,7 +112,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
     e.preventDefault();
     if (localEditStatus.trim() === "") return;
     
-    setUserStatus(localEditStatus.trim());
+    handleUpdateStatus(localEditStatus.trim());
     setIsEditingStatus(false);
   };
 
@@ -152,17 +144,29 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
           <div className="flex flex-col gap-2.5">
             <div className="flex flex-col gap-2.5 bg-[#2d2722]/40 p-2.5 rounded-xl border border-amber-950/20">
               <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => setShowAvatarSelector(!showAvatarSelector)}
-                  className="relative rounded-full focus:outline-none focus:ring-2 focus:ring-amber-500 group cursor-pointer flex-shrink-0"
-                  title="Klik untuk ubah foto profil"
-                >
-                  {renderUserAvatar(userAvatar, "w-11 h-11", "transition-transform duration-150 group-hover:scale-105 border border-amber-700/50 shadow-lg")}
-                  <div className="absolute inset-0 bg-black/45 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-[8px] text-[#E9C46A] font-bold">
-                    {_t("Ubah", "Edit")}
-                  </div>
-                </button>
+                <div className="relative group flex-shrink-0" title="Klik untuk ubah foto profil">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    id="avatar-upload"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      const reader = new FileReader();
+                      reader.onloadend = () => {
+                        handleUpdateAvatar(reader.result as string);
+                      };
+                      reader.readAsDataURL(file);
+                    }}
+                  />
+                  <label htmlFor="avatar-upload" className="cursor-pointer block">
+                    {renderUserAvatar(userAvatar, "w-11 h-11", "transition-transform duration-150 group-hover:scale-105 border border-amber-700/50 shadow-lg")}
+                    <div className="absolute inset-0 bg-black/45 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-[8px] text-[#E9C46A] font-bold">
+                      {_t("Ubah", "Edit")}
+                    </div>
+                  </label>
+                </div>
                 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between mb-1">
@@ -252,80 +256,6 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                   )}
                 </div>
               </div>
-
-              {/* Avatar Selector Panel */}
-              {showAvatarSelector && (
-                <div className="bg-[#1f1b18] border border-amber-950/60 rounded-xl p-2.5 mt-1 animate-fade-in space-y-2 shadow-2xl z-10 relative">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[9.5px] font-bold text-amber-300 font-mono">PILIH FOTO PROFIL:</span>
-                    <button
-                      type="button"
-                      onClick={() => setShowAvatarSelector(false)}
-                      className="text-[#E9C46A] text-[9.5px] hover:underline hover:text-amber-400"
-                    >
-                      Selesai
-                    </button>
-                  </div>
-                  
-                  <div className="grid grid-cols-5 gap-1.5 animate-fade-in">
-                    {PRESET_AVATARS.map((av, idx) => {
-                      const isSelected = userAvatar === av.value;
-                      return (
-                        <button
-                          key={idx}
-                          type="button"
-                          onClick={() => setUserAvatar(av.value)}
-                          className={`p-1 rounded-lg transition-all text-center flex items-center justify-center cursor-pointer border ${
-                            isSelected 
-                              ? "bg-amber-500/25 border-amber-500 scale-105" 
-                              : "bg-black/25 border-transparent hover:bg-black/45 hover:border-white/5"
-                          }`}
-                          title={av.label}
-                        >
-                          {av.value.startsWith("http") ? (
-                            <img
-                              src={av.value}
-                              alt={av.label}
-                              className="w-5.5 h-5.5 rounded-full object-cover border border-amber-900/10 shadow-sm"
-                              referrerPolicy="no-referrer"
-                            />
-                          ) : (
-                            <span className="text-sm">{av.value}</span>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  <form 
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      if (customAvatarInput.trim()) {
-                        setUserAvatar(customAvatarInput.trim());
-                        setCustomAvatarInput("");
-                      }
-                    }}
-                    className="space-y-1.5 pt-1.5 border-t border-white/5"
-                  >
-                    <label className="text-[7.5px] font-mono text-stone-400 block tracking-[0.1em]">ATAU URL FOTO / EMOJI:</label>
-                    <div className="flex gap-1.5">
-                      <input
-                        type="text"
-                        placeholder="https://... atau 🧔"
-                        value={customAvatarInput}
-                        onChange={(e) => setCustomAvatarInput(e.target.value)}
-                        className="bg-black/40 border border-[#44382C] text-[9px] px-2 py-1 rounded text-stone-200 flex-1 focus:outline-none focus:ring-1 focus:ring-amber-500 font-mono"
-                      />
-                      <button
-                        type="submit"
-                        className="bg-[#D4A373] text-neutral-950 font-black text-[9.5px] px-2.5 py-1 rounded hover:bg-amber-400 active:scale-95 transition-all"
-                      >
-                        Ganti
-                      </button>
-                    </div>
-                  </form>
-                </div>
-              )}
             </div>
 
             {/* Quick Status Selection */}
@@ -342,7 +272,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                   <button
                     key={status}
                     onClick={() => {
-                      setUserStatus(status);
+                      handleUpdateStatus(status);
                       setIsEditingStatus(false);
                     }}
                     className={`text-[9.5px] px-2 py-0.5 rounded font-sans transition-all cursor-pointer ${

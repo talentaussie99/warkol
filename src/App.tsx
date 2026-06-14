@@ -62,11 +62,15 @@ export default function App() {
   const [nameChanges, setNameChanges] = useState<string[]>([]);
   const [userId, setUserId] = useState<string>("");
   const [userPin, setUserPin] = useState<string>(() => {
+    const savedPin = localStorage.getItem("user_pin");
+    if (savedPin) return savedPin;
+
     const chars = "0123456789ABCDEF";
     let pinStr = "";
     for (let i = 0; i < 8; i++) {
       pinStr += chars[Math.floor(Math.random() * chars.length)];
     }
+    localStorage.setItem("user_pin", pinStr);
     return pinStr;
   });
   const [isEditingName, setIsEditingName] = useState(false);
@@ -100,10 +104,7 @@ export default function App() {
   const [thirst, setThirst] = useState<number>(100); // Haus (0-100)
   const [foodInventory, setFoodInventory] = useState<(MenuItem & { instanceId: string })[]>([]);
   
-  // User profile picture / avatar state (and selector toggling)
   const [userAvatar, setUserAvatar] = useState<string>("https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&h=150&q=80");
-  const [showAvatarSelector, setShowAvatarSelector] = useState<boolean>(false);
-  const [customAvatarInput, setCustomAvatarInput] = useState<string>("");
   
   // Order frequency limiting & cooldown state
   const [orderHistory, setOrderHistory] = useState<number[]>([]);
@@ -528,6 +529,20 @@ export default function App() {
       handleUnload();
     };
   }, [isLoggedIn, userId, userName, userStatus, userAvatar, activeTableId, userPin, nameChanges]);
+
+  const handleUpdateStatus = async (newStatus: string) => {
+    setUserStatus(newStatus);
+    if (userId) {
+      await supabase.from("pengunjung").update({ status: newStatus }).eq("id", userId);
+    }
+  };
+
+  const handleUpdateAvatar = async (base64Avatar: string) => {
+    setUserAvatar(base64Avatar);
+    if (userId) {
+      await supabase.from("pengunjung").update({ avatar: base64Avatar }).eq("id", userId);
+    }
+  };
 
   // Synchronize mainView with mobileActiveTab for chess integration
   useEffect(() => {
@@ -2683,10 +2698,6 @@ export default function App() {
           thirst={thirst}
           isStatsExpanded={isStatsExpanded}
           setIsStatsExpanded={setIsStatsExpanded}
-          showAvatarSelector={showAvatarSelector}
-          setShowAvatarSelector={setShowAvatarSelector}
-          customAvatarInput={customAvatarInput}
-          setCustomAvatarInput={setCustomAvatarInput}
           isEditingName={isEditingName}
           setIsEditingName={setIsEditingName}
           isEditingStatus={isEditingStatus}
@@ -2696,8 +2707,8 @@ export default function App() {
             setUserName(newName);
             setNameChanges(prev => [...prev, new Date().toISOString()]);
           }}
-          setUserStatus={setUserStatus}
-          setUserAvatar={setUserAvatar}
+          handleUpdateStatus={handleUpdateStatus}
+          handleUpdateAvatar={handleUpdateAvatar}
           setIsLoggedIn={setIsLoggedIn}
           inventory={foodInventory}
           handleConsumeItem={handleConsumeItem}
@@ -3029,8 +3040,9 @@ export default function App() {
                       onClick={async () => {
                         if (confirm(_t("Yakin kawan mau keluar? Kasbonan kamu masih saya catat lho.", "Are you sure you want to log out? We'll keep your tab open."))) {
                           await supabase.from("pengunjung").update({ is_online: false }).eq("id", userId);
+                          setIsLoggedIn(false);
+                          setUserId("");
                           await supabase.auth.signOut();
-                          window.location.reload();
                         }
                       }}
                       className="bg-amber-950 hover:bg-amber-900 text-amber-200 border border-amber-800 px-3 py-1.5 rounded text-[10px] uppercase font-bold tracking-wider transition-colors w-full sm:w-auto"
@@ -3044,9 +3056,10 @@ export default function App() {
                       onClick={async () => {
                         if (confirm(_t("Yakin hapus akun? Semua data simulasi akan lenyap.", "Are you sure you want to delete your account? All simulated data will vanish."))) {
                           await supabase.from("pengunjung").delete().eq("id", userId);
+                          setIsLoggedIn(false);
+                          setUserId("");
                           await supabase.auth.signOut();
                           localStorage.clear();
-                          window.location.reload();
                         }
                       }}
                       className="bg-red-950 hover:bg-red-900 text-red-200 border border-red-800 px-3 py-1.5 rounded text-[10px] uppercase font-bold tracking-wider transition-colors w-full sm:w-auto"
