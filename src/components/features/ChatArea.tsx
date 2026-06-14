@@ -60,6 +60,15 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                   {_t("oleh ", "by ")}@{activeTable.creator}
                 </span>
               )}
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(window.location.href);
+                  alert("Link meja berhasil disalin!");
+                }}
+                className="text-[9px] bg-white/5 hover:bg-white/10 text-stone-300 px-1.5 py-0.5 rounded ml-1 cursor-pointer"
+              >
+                Bagikan
+              </button>
             </div>
             <p className="text-[10px] text-zinc-300 leading-normal mt-0.5 font-sans">
               <strong className="text-zinc-500 mr-1 font-mono">{_t("Topik:", "Topic:")}</strong> {activeTable.topic}

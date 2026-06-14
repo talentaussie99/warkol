@@ -820,7 +820,7 @@ export default function App() {
     const finalImage = newPostImage || (newPostImageFile ? URL.createObjectURL(newPostImageFile) : undefined);
 
     const postId = `post-${Date.now()}`;
-    await supabase.from("linimasa_posts").insert({
+    const { data: newPost, error } = await supabase.from("linimasa_posts").insert({
       id: postId,
       author: userName,
       avatar_color: "bg-[#D4A373]",
@@ -829,7 +829,25 @@ export default function App() {
       timestamp: _t("Baru saja", "Just now"),
       likes: 0,
       liked_by: []
-    });
+    }).select().single();
+
+    if (newPost) {
+      setLinimasaPosts(prev => [
+        {
+          id: newPost.id,
+          author: newPost.author,
+          avatarColor: newPost.avatar_color,
+          text: newPost.text,
+          image: newPost.image || undefined,
+          timestamp: newPost.timestamp,
+          createdAt: new Date(newPost.created_at).getTime(),
+          likes: newPost.likes || 0,
+          isLikedByUser: false,
+          comments: []
+        },
+        ...prev
+      ]);
+    }
 
     setSaldo(s => s + 1000);
     setNewPostText("");
@@ -865,6 +883,13 @@ export default function App() {
       likes: nextLikes,
       liked_by: nextLikedBy
     }).eq("id", postId);
+
+    setLinimasaPosts(prev => prev.map(p => p.id === postId ? {
+      ...p,
+      likes: nextLikes,
+      liked_by: nextLikedBy,
+      isLikedByUser: !isLiked
+    } : p));
 
     if (!isLiked && post.author !== userName) {
       await supabase.from("notifications").insert({
@@ -911,13 +936,19 @@ export default function App() {
     if (!post) return;
 
     const commentId = `com-${Date.now()}`;
-    await supabase.from("linimasa_comments").insert({
+    const newComment = {
       id: commentId,
       post_id: postId,
       author: userName,
       text: txt,
       timestamp: _t("Baru saja", "Just now")
-    });
+    };
+    await supabase.from("linimasa_comments").insert(newComment);
+
+    setLinimasaPosts(prev => prev.map(p => p.id === postId ? {
+        ...p,
+        comments: [...p.comments, newComment]
+    } : p));
 
     if (post.author !== userName) {
       await supabase.from("notifications").insert({
@@ -1708,7 +1739,7 @@ export default function App() {
           >
             <div className="flex items-center justify-between mb-1.5">
               <span className="text-[10px] font-bold text-[#E9C46A] uppercase flex items-center gap-1.5 font-sans tracking-wider font-semibold">
-                👑 {_t("Pojok Catur Bapak-Bapak", "Dad's Chess Corner")}
+                👑 {_t("Pojok Catur", "Chess Corner")}
               </span>
               <span className={`text-[8px] font-mono select-none px-2 py-0.5 rounded font-bold uppercase tracking-widest ${
                 mainView === "chess" 
@@ -3041,10 +3072,31 @@ export default function App() {
                     <button
                       onClick={async () => {
                         if (confirm(_t("Yakin kawan mau keluar? Kasbonan kamu masih saya catat lho.", "Are you sure you want to log out? We'll keep your tab open."))) {
-                          await supabase.from("pengunjung").update({ is_online: false }).eq("id", userId);
+                          try {
+                            await supabase.from("pengunjung").update({ is_online: false }).eq("id", userId);
+                          } catch (e) {
+                            console.error("Error setting offline status:", e);
+                          }
                           setIsLoggedIn(false);
                           setUserId("");
-                          await supabase.auth.signOut();
+                          try {
+                            await supabase.auth.signOut();
+                          } catch (e) {
+                            console.error("Error signing out:", e);
+                          }
+                          // Manually remove all supabase credentials and sessions to avoid any auto-login on reload
+                          Object.keys(localStorage).forEach(key => {
+                            if (key.startsWith("sb-") || key.includes("supabase.auth")) {
+                              localStorage.removeItem(key);
+                            }
+                          });
+                          localStorage.removeItem("user_pin");
+                          localStorage.removeItem("user_avatar");
+                          localStorage.removeItem("tutorial_done");
+                          
+                          // Wait a moment for localStorage to guarantee saving changed files before reloading
+                          await new Promise(resolve => setTimeout(resolve, 500));
+                          window.location.reload();
                         }
                       }}
                       className="bg-amber-950 hover:bg-amber-900 text-amber-200 border border-amber-800 px-3 py-1.5 rounded text-[10px] uppercase font-bold tracking-wider transition-colors w-full sm:w-auto"
@@ -3057,11 +3109,22 @@ export default function App() {
                     <button
                       onClick={async () => {
                         if (confirm(_t("Yakin hapus akun? Semua data simulasi akan lenyap.", "Are you sure you want to delete your account? All simulated data will vanish."))) {
-                          await supabase.from("pengunjung").delete().eq("id", userId);
+                          try {
+                            await supabase.from("pengunjung").delete().eq("id", userId);
+                          } catch (e) {
+                            console.error("Error deleting user from pengunjung:", e);
+                          }
                           setIsLoggedIn(false);
                           setUserId("");
-                          await supabase.auth.signOut();
+                          try {
+                            await supabase.auth.signOut();
+                          } catch (e) {
+                            console.error("Error signing out:", e);
+                          }
                           localStorage.clear();
+                          sessionStorage.clear();
+                          await new Promise(resolve => setTimeout(resolve, 500));
+                          window.location.reload();
                         }
                       }}
                       className="bg-red-950 hover:bg-red-900 text-red-200 border border-red-800 px-3 py-1.5 rounded text-[10px] uppercase font-bold tracking-wider transition-colors w-full sm:w-auto"
