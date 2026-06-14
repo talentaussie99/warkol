@@ -778,7 +778,7 @@ export default function ChessBoard({
           <span className="text-xl">🪵</span>
           <div>
             <div className="flex items-center gap-1">
-              <h3 className="text-xs font-bold text-white uppercase tracking-wider">Pojok Catur Bapak-Bapak</h3>
+              <h3 className="text-xs font-bold text-white uppercase tracking-wider">Pojok Catur</h3>
               <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
             </div>
             <p className="text-[10px] text-amber-500 font-mono">
@@ -811,8 +811,10 @@ export default function ChessBoard({
             </button>
             {/* Solo removed */}
             <button
-              onClick={() => { setGameMode("MULTIPLAYER"); }}
-              className={`py-1 text-[10px] font-bold rounded border transition ${gameMode === "MULTIPLAYER" ? "bg-amber-950/40 text-amber-300 border-amber-800" : "bg-white/5 text-white/50 border-transparent"}`}
+              onClick={() => { 
+                alert("Fitur Duel Tab / Multiplayer sementara belum tersedia, silakan bantai bot dulu kawan!");
+              }}
+              className={`py-1 text-[10px] font-bold rounded border transition opacity-40 grayscale cursor-not-allowed bg-white/5 text-white/30 border-transparent`}
             >
               🤝 Duel Tab
             </button>

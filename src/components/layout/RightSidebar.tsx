@@ -130,7 +130,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
               <span className="text-[8px] font-mono select-none px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/15 uppercase tracking-widest font-bold">{_t("PELANGGAN", "CUSTOMER")}</span>
               <button
                 onClick={async () => {
-                  if (confirm(_t("Yakin kawan mau keluar? Kasbonan kamu masih saya catat lho.", "Are you sure you want to log out? We'll keep your tab open."))) {
+                  if (confirm(_t("Yakin mau cabut? Buru-buru banget lho.", "Are you sure you want to log out?"))) {
                     try {
                       const { data: { user } } = await supabase.auth.getUser();
                       if (user) {

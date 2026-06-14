@@ -2804,10 +2804,10 @@ export default function App() {
                               <span className="text-[9px] font-mono text-stone-600 uppercase tracking-tight">{notif.timestamp}</span>
                               {notif.type === 'chess_challenge' ? (
                                 <button 
-                                  onClick={() => handleChessChallengeFromNotification(notif as any)}
-                                  className="text-[9px] font-black text-emerald-500 hover:text-emerald-400 uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer flex items-center gap-1"
+                                  onClick={() => alert("Fitur Duel Live antar warga sementara belum tersedia, silakan bantai bot dulu kawan!")}
+                                  className="text-[9px] font-black text-emerald-500/50 hover:text-emerald-500/70 uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer flex items-center gap-1"
                                 >
-                                  {_t("TERIMA TANTANGAN", "ACCEPT")}
+                                  {_t("BELUM TERSEDIA", "SOON")}
                                 </button>
                               ) : notif.type === 'tag' ? (
                                 <button 
