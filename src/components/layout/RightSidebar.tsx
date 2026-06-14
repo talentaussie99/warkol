@@ -159,7 +159,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                     setMainView("chat");
                     
                     await new Promise(resolve => setTimeout(resolve, 500));
-                    window.location.reload();
+                    window.location.href = "/";
                   }
                 }}
                 className="text-[8px] bg-[#2a1310] hover:bg-rose-950 text-rose-300 border border-rose-900/45 px-1.5 py-0.5 rounded font-mono font-bold tracking-wider cursor-pointer transition-colors"

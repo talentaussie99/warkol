@@ -14,6 +14,8 @@ interface LoginPageProps {
   setUserStatus: (v: string) => void;
   PRESET_AVATARS: any[];
   renderUserAvatar: any;
+  authMode: "login" | "register" | "forgot";
+  setAuthMode: (v: "login" | "register" | "forgot") => void;
 }
 
 export const LoginPage: React.FC<LoginPageProps> = ({
@@ -27,10 +29,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   setIsLoggedIn,
   setUserStatus,
   PRESET_AVATARS,
-  renderUserAvatar
+  renderUserAvatar,
+  authMode,
+  setAuthMode
 }) => {
-  // Authentication Modes: "login" | "register" | "forgot"
-  const [authMode, setAuthMode] = useState<"login" | "register" | "forgot">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");

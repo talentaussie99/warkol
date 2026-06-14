@@ -56,6 +56,7 @@ import { TutorialModal } from "./components/modals/TutorialModal";
 
 export default function App() {
   // Application State
+  const [authMode, setAuthMode] = useState<"login" | "register" | "forgot">("login");
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userName, setUserName] = useState("Kamu (Nongkrong)");
@@ -568,7 +569,13 @@ export default function App() {
         setActiveTableId(mejaId);
       }
       
-      if (path.includes("/papancerita")) {
+      if (path.includes("/daftar")) {
+        setAuthMode("register");
+      } else if (path.includes("/lupakatasandi")) {
+        setAuthMode("forgot");
+      } else if (path.includes("/masuk")) {
+        setAuthMode("login");
+      } else if (path.includes("/papancerita")) {
         setMainView("chat");
         setMobileActiveTab("chat");
         setDashboardTab("linimasa");
@@ -593,19 +600,30 @@ export default function App() {
 
   useEffect(() => {
     let path = "/beranda";
-    if (mainView === "chess") {
-      path = "/pojokcatur";
-    } else if (dashboardTab === "linimasa") {
-      path = "/papancerita";
-    } else if (dashboardTab === "pemberitahuan") {
-      path = "/pemberitahuan";
-    } else if (dashboardTab === "obrolan") {
-      path = "/beranda";
-    }
-
     let search = "";
-    if (activeTableId && activeTableId !== TableId.SANTAI) {
-      search = `?meja=${activeTableId}`;
+
+    if (!isLoggedIn) {
+      if (authMode === "register") {
+        path = "/daftar";
+      } else if (authMode === "forgot") {
+        path = "/lupakatasandi";
+      } else {
+        path = "/masuk";
+      }
+    } else {
+      if (mainView === "chess") {
+        path = "/pojokcatur";
+      } else if (dashboardTab === "linimasa") {
+        path = "/papancerita";
+      } else if (dashboardTab === "pemberitahuan") {
+        path = "/pemberitahuan";
+      } else if (dashboardTab === "obrolan") {
+        path = "/beranda";
+      }
+
+      if (activeTableId && activeTableId !== TableId.SANTAI) {
+        search = `?meja=${activeTableId}`;
+      }
     }
 
     const currentFull = window.location.pathname + window.location.search;
@@ -613,7 +631,7 @@ export default function App() {
     if (currentFull !== targetFull) {
       window.history.pushState(null, "", targetFull);
     }
-  }, [mainView, dashboardTab, activeTableId]);
+  }, [isLoggedIn, authMode, mainView, dashboardTab, activeTableId]);
 
   // Cooldown countdown effect
   useEffect(() => {
@@ -1633,6 +1651,8 @@ export default function App() {
           setUserStatus={setUserStatus}
           PRESET_AVATARS={PRESET_AVATARS}
           renderUserAvatar={renderUserAvatar}
+          authMode={authMode}
+          setAuthMode={setAuthMode}
         />
       ) : (
         <>
@@ -3207,7 +3227,7 @@ export default function App() {
                           
                           // Wait a moment for localStorage to guarantee saving changed files before reloading
                           await new Promise(resolve => setTimeout(resolve, 500));
-                          window.location.reload();
+                          window.location.href = "/";
                         }
                       }}
                       className="bg-amber-950 hover:bg-amber-900 text-amber-200 border border-amber-800 px-3 py-1.5 rounded text-[10px] uppercase font-bold tracking-wider transition-colors w-full sm:w-auto"
@@ -3235,7 +3255,7 @@ export default function App() {
                           localStorage.clear();
                           sessionStorage.clear();
                           await new Promise(resolve => setTimeout(resolve, 500));
-                          window.location.reload();
+                          window.location.href = "/";
                         }
                       }}
                       className="bg-red-950 hover:bg-red-900 text-red-200 border border-red-800 px-3 py-1.5 rounded text-[10px] uppercase font-bold tracking-wider transition-colors w-full sm:w-auto"
