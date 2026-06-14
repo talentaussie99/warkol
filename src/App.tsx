@@ -193,7 +193,14 @@ export default function App() {
         const botNames = [
           "Bang Bakso", "Om Galon", "Kang Pecel", "Bang Soto", "Om Lele", "Kang Bubur",
           "Pak RT", "Mbah Kopi", "Cak Lontong", "Lek Kupat", "Pak RW", "Kang Siomay",
-          "Mas Batagor", "Mpok Jamu", "Bang Ojol", "Mas Gorengan", "Kang Gorengan"
+          "Mas Batagor", "Mpok Jamu", "Bang Ojol", "Mas Gorengan", "Kang Gorengan",
+          "Bang bakso", "Om galon", "Kang pecel", "Bang soto", "Om lele", "Kang bubur",
+          "Pak Rt", "Mbah kopi", "Cak lontong", "Lek kupat", "Pak Rw", "Kang siomay",
+          "Mas batagor", "Mpok jamu", "Bang ojol", "Mas gorengan", "Kang gorengan",
+          "bang bakso", "om galon", "kang pecel", "bang soto", "om lele", "kang bubur",
+          "pak rt", "mbah kopi", "cak lontong", "lek kupat", "pak rw", "kang siomay",
+          "mas batagor", "mpok jamu", "bang ojol", "mas gorengan", "kang gorengan",
+          "PAK RT", "PAK RW", "KANG PECEL", "MAS GORENGAN"
         ];
         await supabase.from("pesan_chat").delete().in("sender", botNames);
         await supabase.from("pengunjung").delete().in("name", botNames);
@@ -335,12 +342,17 @@ export default function App() {
         .order("created_at", { ascending: true });
 
       if (!error && data) {
-        const botNames = [
-          "Bang Bakso", "Om Galon", "Kang Pecel", "Bang Soto", "Om Lele", "Kang Bubur",
-          "Pak RT", "Mbah Kopi", "Cak Lontong", "Lek Kupat", "Pak RW", "Kang Siomay",
-          "Mas Batagor", "Mpok Jamu", "Bang Ojol", "Mas Gorengan", "Kang Gorengan"
+        const botNamesLower = [
+          "bang bakso", "om galon", "kang pecel", "bang soto", "om lele", "kang bubur",
+          "pak rt", "mbah kopi", "cak lontong", "lek kupat", "pak rw", "kang siomay",
+          "mas batagor", "mpok jamu", "bang ojol", "mas gorengan", "kang gorengan"
         ];
-        const realMessages = data.filter((m: any) => !botNames.includes(m.sender));
+        const realMessages = data.filter((m: any) => {
+          if (!m.sender) return false;
+          const senderLower = m.sender.toLowerCase().trim();
+          if (userName && senderLower === userName.toLowerCase().trim()) return true;
+          return !botNamesLower.includes(senderLower);
+        });
 
         const grouped: Record<string, Message[]> = {};
         realMessages.forEach((m: any) => {
