@@ -2,6 +2,7 @@ import React from "react";
 import { User, Bell, DollarSign, Clock, PackageOpen } from "lucide-react";
 import { MenuItem } from "../../types";
 import { renderUserAvatar, PRESET_AVATARS } from "../common/UIComponents";
+import { supabase } from "../../lib/supabaseClient";
 
 interface RightSidebarProps {
   _t: (id: string, en: string) => string;
@@ -128,11 +129,38 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
             <div className="flex items-center gap-1.5">
               <span className="text-[8px] font-mono select-none px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/15 uppercase tracking-widest font-bold">{_t("PELANGGAN", "CUSTOMER")}</span>
               <button
-                onClick={() => {
-                   setIsLoggedIn(false);
-                   setUserName(_t("Kamu (Nongkrong)", "You (Hanging out)"));
-                   setActiveTableId(TableId.SANTAI);
-                   setMainView("chat");
+                onClick={async () => {
+                  if (confirm(_t("Yakin kawan mau keluar? Kasbonan kamu masih saya catat lho.", "Are you sure you want to log out? We'll keep your tab open."))) {
+                    try {
+                      const { data: { user } } = await supabase.auth.getUser();
+                      if (user) {
+                        await supabase.from("pengunjung").update({ is_online: false }).eq("id", user.id);
+                      }
+                    } catch (e) {
+                      console.error("Error setting offline status:", e);
+                    }
+                    try {
+                      await supabase.auth.signOut();
+                    } catch (e) {
+                      console.error("Error signing out:", e);
+                    }
+                    Object.keys(localStorage).forEach(key => {
+                      if (key.startsWith("sb-") || key.includes("supabase.auth")) {
+                        localStorage.removeItem(key);
+                      }
+                    });
+                    localStorage.removeItem("user_pin");
+                    localStorage.removeItem("user_avatar");
+                    localStorage.removeItem("tutorial_done");
+                    
+                    setIsLoggedIn(false);
+                    setUserName(_t("Kamu (Nongkrong)", "You (Hanging out)"));
+                    setActiveTableId(TableId.SANTAI);
+                    setMainView("chat");
+                    
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                    window.location.reload();
+                  }
                 }}
                 className="text-[8px] bg-[#2a1310] hover:bg-rose-950 text-rose-300 border border-rose-900/45 px-1.5 py-0.5 rounded font-mono font-bold tracking-wider cursor-pointer transition-colors"
               >

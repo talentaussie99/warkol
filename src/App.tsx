@@ -517,8 +517,12 @@ export default function App() {
     };
 
     upsertVisitor();
+  }, [isLoggedIn, userId, userName, userStatus, userAvatar, activeTableId, userPin, nameChanges, saldo, hunger, thirst, foodInventory]);
 
-    // Mark offline on unmount/unload
+  // Separate session-based unload hook to only run on genuine logout or window exit
+  useEffect(() => {
+    if (!isLoggedIn || !userId) return;
+
     const handleUnload = async () => {
       await supabase.from("pengunjung").update({ is_online: false }).eq("id", userId);
     };
@@ -528,7 +532,7 @@ export default function App() {
       window.removeEventListener("beforeunload", handleUnload);
       handleUnload();
     };
-  }, [isLoggedIn, userId, userName, userStatus, userAvatar, activeTableId, userPin, nameChanges]);
+  }, [isLoggedIn, userId]);
 
   const handleUpdateStatus = async (newStatus: string) => {
     setUserStatus(newStatus);
@@ -553,6 +557,63 @@ export default function App() {
       setMobileActiveTab("chat");
     }
   }, [mainView]);
+
+  // Synchronize browser URL route paths with active views and query parameters (Warkop Custom Router)
+  useEffect(() => {
+    const syncURLFromBrowser = () => {
+      const path = window.location.pathname;
+      const searchParams = new URLSearchParams(window.location.search);
+      const mejaId = searchParams.get("meja");
+      if (mejaId) {
+        setActiveTableId(mejaId);
+      }
+      
+      if (path.includes("/papancerita")) {
+        setMainView("chat");
+        setMobileActiveTab("chat");
+        setDashboardTab("linimasa");
+      } else if (path.includes("/pojokcatur")) {
+        setMainView("chess");
+        setMobileActiveTab("chess");
+      } else if (path.includes("/pemberitahuan")) {
+        setMainView("chat");
+        setMobileActiveTab("chat");
+        setDashboardTab("pemberitahuan");
+      } else if (path.includes("/beranda")) {
+        setMainView("chat");
+        setMobileActiveTab("chat");
+        setDashboardTab("obrolan");
+      }
+    };
+
+    syncURLFromBrowser();
+    window.addEventListener("popstate", syncURLFromBrowser);
+    return () => window.removeEventListener("popstate", syncURLFromBrowser);
+  }, []);
+
+  useEffect(() => {
+    let path = "/beranda";
+    if (mainView === "chess") {
+      path = "/pojokcatur";
+    } else if (dashboardTab === "linimasa") {
+      path = "/papancerita";
+    } else if (dashboardTab === "pemberitahuan") {
+      path = "/pemberitahuan";
+    } else if (dashboardTab === "obrolan") {
+      path = "/beranda";
+    }
+
+    let search = "";
+    if (activeTableId && activeTableId !== TableId.SANTAI) {
+      search = `?meja=${activeTableId}`;
+    }
+
+    const currentFull = window.location.pathname + window.location.search;
+    const targetFull = path + search;
+    if (currentFull !== targetFull) {
+      window.history.pushState(null, "", targetFull);
+    }
+  }, [mainView, dashboardTab, activeTableId]);
 
   // Cooldown countdown effect
   useEffect(() => {
@@ -820,7 +881,7 @@ export default function App() {
     const finalImage = newPostImage || (newPostImageFile ? URL.createObjectURL(newPostImageFile) : undefined);
 
     const postId = `post-${Date.now()}`;
-    const { data: newPost, error } = await supabase.from("linimasa_posts").insert({
+    const postObj = {
       id: postId,
       author: userName,
       avatar_color: "bg-[#D4A373]",
@@ -829,25 +890,26 @@ export default function App() {
       timestamp: _t("Baru saja", "Just now"),
       likes: 0,
       liked_by: []
-    }).select().single();
+    };
 
-    if (newPost) {
-      setLinimasaPosts(prev => [
-        {
-          id: newPost.id,
-          author: newPost.author,
-          avatarColor: newPost.avatar_color,
-          text: newPost.text,
-          image: newPost.image || undefined,
-          timestamp: newPost.timestamp,
-          createdAt: new Date(newPost.created_at).getTime(),
-          likes: newPost.likes || 0,
-          isLikedByUser: false,
-          comments: []
-        },
-        ...prev
-      ]);
-    }
+    const { data: newPost, error } = await supabase.from("linimasa_posts").insert(postObj).select().single();
+
+    const actualPost = newPost || postObj;
+    setLinimasaPosts(prev => [
+      {
+        id: actualPost.id,
+        author: actualPost.author,
+        avatarColor: actualPost.avatar_color || "bg-[#D4A373]",
+        text: actualPost.text,
+        image: actualPost.image || undefined,
+        timestamp: actualPost.timestamp,
+        createdAt: actualPost.created_at ? new Date(actualPost.created_at).getTime() : Date.now(),
+        likes: actualPost.likes || 0,
+        isLikedByUser: false,
+        comments: []
+      },
+      ...prev
+    ]);
 
     setSaldo(s => s + 1000);
     setNewPostText("");
@@ -1020,7 +1082,7 @@ export default function App() {
 
     // Save to Supabase
     const userMsgId = `user-${Date.now()}`;
-    await supabase.from("pesan_chat").insert({
+    const userMsgObj = {
       id: userMsgId,
       table_id: activeTableId,
       sender: userName,
@@ -1029,7 +1091,27 @@ export default function App() {
       tag: "Warga",
       timestamp: stamp,
       color: "text-[#E9C46A] bg-amber-950/70 border-amber-500"
-    });
+    };
+
+    // Append instantly to local state to avoid database sync lag
+    setChats(prev => ({
+      ...prev,
+      [activeTableId]: [
+        ...(prev[activeTableId] || []),
+        {
+          id: userMsgObj.id,
+          sender: userMsgObj.sender,
+          text: userMsgObj.text,
+          role: userMsgObj.role as any,
+          tag: userMsgObj.tag,
+          timestamp: userMsgObj.timestamp,
+          color: userMsgObj.color,
+          isWithdrawn: false
+        }
+      ]
+    }));
+
+    await supabase.from("pesan_chat").insert(userMsgObj);
 
     // Decrease Hunger and Thirst slightly since talking is hard work!
     setHunger(prev => Math.max(0, prev - (Math.random() > 0.85 ? 1 : 0)));
@@ -1071,17 +1153,38 @@ export default function App() {
 
       // Inject tag optionally
       const replyText = injectTagIfPossible(rawReplyText, userName, replier);
+      const replyId = `reply-${Date.now()}`;
+      const replyStamp = now.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
 
-      await supabase.from("pesan_chat").insert({
-        id: `reply-${Date.now()}`,
+      const botMsgObj = {
+        id: replyId,
         table_id: activeTableId,
         sender: replier,
         text: replyText,
         role: "guest",
         tag: replyTag,
-        timestamp: now.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }),
+        timestamp: replyStamp,
         color: replyColor
-      });
+      };
+
+      setChats(prev => ({
+        ...prev,
+        [activeTableId]: [
+          ...(prev[activeTableId] || []),
+          {
+            id: botMsgObj.id,
+            sender: botMsgObj.sender,
+            text: botMsgObj.text,
+            role: botMsgObj.role as any,
+            tag: botMsgObj.tag,
+            timestamp: botMsgObj.timestamp,
+            color: botMsgObj.color,
+            isWithdrawn: false
+          }
+        ]
+      }));
+
+      await supabase.from("pesan_chat").insert(botMsgObj);
     }, 1200);
   };
 
@@ -2736,9 +2839,17 @@ export default function App() {
           isEditingStatus={isEditingStatus}
           setIsEditingStatus={setIsEditingStatus}
           setUserName={setUserName}
-          handleNameChange={(newName) => {
+          handleNameChange={async (newName) => {
             setUserName(newName);
-            setNameChanges(prev => [...prev, new Date().toISOString()]);
+            const ts = new Date().toISOString();
+            const updated = [...nameChanges, ts];
+            setNameChanges(updated);
+            if (userId) {
+              await supabase.from("pengunjung").update({
+                name: newName,
+                name_changes: updated
+              }).eq("id", userId);
+            }
           }}
           handleUpdateStatus={handleUpdateStatus}
           handleUpdateAvatar={handleUpdateAvatar}
