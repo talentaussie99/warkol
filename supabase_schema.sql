@@ -42,6 +42,7 @@ CREATE TABLE IF NOT EXISTS pengunjung (
   hunger INTEGER DEFAULT 100,
   thirst INTEGER DEFAULT 100,
   inventory JSONB DEFAULT '[]'::jsonb,
+  tutorial_done BOOLEAN DEFAULT false,
   last_active_at TIMESTAMPTZ DEFAULT NOW(),
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -58,6 +59,7 @@ ALTER TABLE pengunjung REPLICA IDENTITY FULL;
 CREATE TABLE IF NOT EXISTS linimasa_posts (
   id TEXT PRIMARY KEY,
   author TEXT NOT NULL,
+  author_id TEXT,
   avatar_color TEXT DEFAULT 'bg-[#D4A373]',
   text TEXT,
   image TEXT,
@@ -80,6 +82,7 @@ CREATE TABLE IF NOT EXISTS linimasa_comments (
   id TEXT PRIMARY KEY,
   post_id TEXT REFERENCES linimasa_posts(id) ON DELETE CASCADE,
   author TEXT NOT NULL,
+  author_id TEXT,
   text TEXT NOT NULL,
   timestamp TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW()
@@ -98,11 +101,13 @@ CREATE TABLE IF NOT EXISTS notifications (
   id TEXT PRIMARY KEY,
   type TEXT NOT NULL,
   sender TEXT NOT NULL,
+  sender_id TEXT,
   post_id TEXT REFERENCES linimasa_posts(id) ON DELETE CASCADE,
   content TEXT,
   timestamp TEXT,
   is_read BOOLEAN DEFAULT false,
   recipient TEXT,
+  recipient_id TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -119,6 +124,7 @@ CREATE TABLE IF NOT EXISTS pesan_chat (
   id TEXT PRIMARY KEY,
   table_id TEXT,
   sender TEXT NOT NULL,
+  sender_id TEXT,
   text TEXT NOT NULL,
   role TEXT DEFAULT 'user',
   tag TEXT,

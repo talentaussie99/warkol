@@ -61,9 +61,10 @@ export default function App() {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isProfileLoaded, setIsProfileLoaded] = useState(false);
-  const [userName, setUserName] = useState("Kamu (Nongkrong)");
+  const [userName, setUserName] = useState("");
   const [nameChanges, setNameChanges] = useState<string[]>([]);
   const [userId, setUserId] = useState<string>("");
+  const [tutorialDone, setTutorialDone] = useState<boolean>(false);
   const [userPin, setUserPin] = useState<string>(() => {
     const savedPin = localStorage.getItem("user_pin");
     if (savedPin) return savedPin;
@@ -204,7 +205,7 @@ export default function App() {
         // Fetch saved saldo, hunger, thirst, inventory for this user
         let { data, error } = await supabase
           .from("pengunjung")
-          .select("name, status, avatar, name_changes, saldo, hunger, thirst, inventory")
+          .select("name, status, avatar, name_changes, saldo, hunger, thirst, inventory, tutorial_done")
           .eq("id", currentUserId)
           .maybeSingle();
         
@@ -216,7 +217,7 @@ export default function App() {
            // Fallback attempt migration from old email-based ID
            const { data: oldData, error: oldError } = await supabase
              .from("pengunjung")
-             .select("name, status, avatar, name_changes, saldo, hunger, thirst, inventory")
+             .select("name, status, avatar, name_changes, saldo, hunger, thirst, inventory, tutorial_done")
              .eq("id", `visitor-${defaultNick}`)
              .maybeSingle();
            if (oldData) data = oldData;
@@ -226,12 +227,12 @@ export default function App() {
         if (!active) return;
 
         if (data) {
-          if (data.name) setUserName(data.name);
-          else setUserName(defaultNick);
+          setUserName(data.name || defaultNick);
           
           if (data.status) setUserStatus(data.status);
           if (data.avatar) setUserAvatar(data.avatar);
           if (data.name_changes) setNameChanges(data.name_changes);
+          setTutorialDone(data.tutorial_done || false);
           
           setSaldo(data.saldo ?? 20000);
           setHunger(data.hunger ?? 100);
@@ -246,6 +247,7 @@ export default function App() {
           setHunger(100);
           setThirst(100);
           setFoodInventory([]);
+          setTutorialDone(false);
           setIsProfileLoaded(true);
         } else {
           // If there's an error (like RLS), we don't set isProfileLoaded to true
@@ -254,7 +256,8 @@ export default function App() {
         }
 
         if (data || !error) {
-          if (!localStorage.getItem("tutorial_done")) {
+          const isDone = data?.tutorial_done || localStorage.getItem("tutorial_done") === "true";
+          if (!isDone) {
             setShowTutorial(true);
           }
         }
@@ -262,6 +265,7 @@ export default function App() {
         if (!active) return;
         setIsLoggedIn(false);
         setUserId("");
+        setUserName("");
         setIsProfileLoaded(false);
       }
       setIsAuthLoading(false);
@@ -580,6 +584,7 @@ export default function App() {
           is_online: true,
           table_id: activeTableId,
           pin: userPin,
+          tutorial_done: tutorialDone,
           saldo: saldo,
           hunger: hunger,
           thirst: thirst,
@@ -627,6 +632,32 @@ export default function App() {
       handleUnload();
     };
   }, [isLoggedIn, userId]);
+
+  const handleNameChange = async (newName: string) => {
+    const oldName = userName;
+    setUserName(newName);
+    const ts = new Date().toISOString();
+    const updated = [...nameChanges, ts];
+    setNameChanges(updated);
+    
+    if (userId) {
+      // 1. Update Profile
+      await supabase.from("pengunjung").update({
+        name: newName,
+        name_changes: updated
+      }).eq("id", userId);
+
+      // 2. Bulk Rename historical records
+      await supabase.from("pesan_chat").update({ sender: newName }).eq("sender_id", userId);
+      await supabase.from("pesan_chat").update({ sender: newName }).eq("sender", oldName);
+      await supabase.from("linimasa_posts").update({ author: newName }).eq("author_id", userId);
+      await supabase.from("linimasa_posts").update({ author: newName }).eq("author", oldName);
+      await supabase.from("linimasa_comments").update({ author: newName }).eq("author_id", userId);
+      await supabase.from("linimasa_comments").update({ author: newName }).eq("author", oldName);
+      await supabase.from("notifications").update({ sender: newName }).eq("sender_id", userId);
+      await supabase.from("notifications").update({ sender: newName }).eq("sender", oldName);
+    }
+  };
 
   const handleUpdateStatus = async (newStatus: string) => {
     setUserStatus(newStatus);
@@ -1029,17 +1060,18 @@ export default function App() {
 
     const finalImage = newPostImage || (newPostImageFile ? URL.createObjectURL(newPostImageFile) : undefined);
 
-    const postId = `post-${Date.now()}`;
-    const postObj = {
-      id: postId,
-      author: userName,
-      avatar_color: "bg-[#D4A373]",
-      text: newPostText,
-      image: finalImage,
-      timestamp: _t("Baru saja", "Just now"),
-      likes: 0,
-      liked_by: []
-    };
+      const postId = `post-${Date.now()}`;
+      const postObj = {
+        id: postId,
+        author: userName,
+        author_id: userId,
+        avatar_color: "bg-[#D4A373]",
+        text: newPostText,
+        image: finalImage,
+        timestamp: _t("Baru saja", "Just now"),
+        likes: 0,
+        liked_by: []
+      };
 
     const { data: newPost, error } = await supabase.from("linimasa_posts").insert(postObj).select().single();
 
@@ -1153,6 +1185,7 @@ export default function App() {
       id: commentId,
       post_id: postId,
       author: userName,
+      author_id: userId,
       text: txt,
       timestamp: _t("Baru saja", "Just now")
     };
@@ -1168,6 +1201,7 @@ export default function App() {
         id: `notif-comment-${Date.now()}`,
         type: "comment",
         sender: userName,
+        sender_id: userId,
         post_id: postId,
         content: `${_t("mengomentari:", "commented:")} "${txt}"`,
         timestamp: _t("Baru saja", "Just now"),
@@ -1237,6 +1271,7 @@ export default function App() {
       id: userMsgId,
       table_id: activeTableId,
       sender: userName,
+      sender_id: userId,
       text: originalMsg,
       role: "user",
       tag: "Warga",
@@ -1881,7 +1916,7 @@ export default function App() {
                       <span className="font-sans text-sm font-semibold flex items-center gap-1.5 flex-wrap">
                         <span className="text-base leading-none">{table.icon}</span> 
                         <span>{table.name}</span>
-                        {table.creator && (
+                        {table.creator && table.id !== TableId.SANTAI && (
                           <span className="text-[8px] bg-rose-950/40 border border-rose-500/20 text-rose-400 px-1 py-0.2 rounded font-mono font-bold flex items-center gap-0.5 uppercase tracking-wide">
                             🔒 Private
                           </span>
@@ -2929,18 +2964,7 @@ export default function App() {
           isEditingStatus={isEditingStatus}
           setIsEditingStatus={setIsEditingStatus}
           setUserName={setUserName}
-          handleNameChange={async (newName) => {
-            setUserName(newName);
-            const ts = new Date().toISOString();
-            const updated = [...nameChanges, ts];
-            setNameChanges(updated);
-            if (userId) {
-              await supabase.from("pengunjung").update({
-                name: newName,
-                name_changes: updated
-              }).eq("id", userId);
-            }
-          }}
+          handleNameChange={handleNameChange}
           handleUpdateStatus={handleUpdateStatus}
           handleUpdateAvatar={handleUpdateAvatar}
           setIsLoggedIn={setIsLoggedIn}
@@ -3272,7 +3296,7 @@ export default function App() {
                     
                     <button
                       onClick={async () => {
-                        if (confirm(_t("Yakin kawan mau keluar? Kasbonan kamu masih saya catat lho.", "Are you sure you want to log out? We'll keep your tab open."))) {
+                        if (confirm(_t("Yakin mau cabut duluan? Buru-buru banget lho. 😂", "Are you sure you want to log out? That was quick. 😂"))) {
                           try {
                             await supabase.from("pengunjung").update({ is_online: false }).eq("id", userId);
                           } catch (e) {
@@ -3712,9 +3736,13 @@ export default function App() {
         <TutorialModal
           step={tutorialStep}
           onNext={() => setTutorialStep(prev => prev + 1)}
-          onClose={() => {
+          onClose={async () => {
             setShowTutorial(false);
+            setTutorialDone(true);
             localStorage.setItem("tutorial_done", "true");
+            if (userId) {
+              await supabase.from("pengunjung").update({ tutorial_done: true }).eq("id", userId);
+            }
           }}
         />
       )}
