@@ -2169,8 +2169,17 @@ export default function App() {
             {dashboardTab === "obrolan" && (
               <div className="flex flex-col gap-1.5 font-sans">
                 <div className="flex items-center justify-between px-1 flex-wrap gap-2">
-                  <div className="flex items-center gap-2.5 flex-wrap">
-                    <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest">Suasana Warkop</span>
+                  <div className="flex items-center justify-between w-full flex-wrap gap-2">
+                    <div className="flex flex-col">
+                      <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest mb-1.5 block lg:hidden">Suasana Warkop</span>
+                      <div className="lg:hidden flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/20 shadow-[0_0_10px_rgba(16,185,129,0.1)] mb-1">
+                        <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)] animate-pulse"></div>
+                        <span className="text-[10px] font-black text-emerald-400 font-mono tracking-tight uppercase">
+                          {pengunjung.filter(p => p.isOnline).length} {_t("Warga Lagi Nongkrong", "People Hangout Now")}
+                        </span>
+                      </div>
+                      <span className="hidden lg:block text-[9px] font-mono text-zinc-500 uppercase tracking-widest">Suasana Warkop</span>
+                    </div>
                     <span className="text-[9px] text-[#E9C46A] font-mono font-bold">
                       📢 Mau ngiklan dibanner? kirim ke warkol.ads@gmail.com
                     </span>
@@ -2179,7 +2188,7 @@ export default function App() {
                 <div id="warkop-banner-container" className="w-full overflow-hidden rounded-xl border border-white/5 bg-[#1a1a1a] shadow-md animate-fade-in">
                   <img
                     id="warkop-banner-img"
-                    src="https://imgur.com/onB4wid.jpg"
+                    src="https://imgur.com/5kOghAH.jpg"
                     alt="Warkop Indonesia"
                     className="w-full h-auto object-cover max-h-[240px] block"
                     referrerPolicy="no-referrer"
@@ -3029,18 +3038,18 @@ export default function App() {
 
       {/* MOBILE BOTTOM NAVIGATION BAR */}
       {isLoggedIn && (
-        <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-[#171412]/95 backdrop-blur-md border-t border-amber-900/40 px-3 py-2 flex items-center justify-between z-50 shadow-[0_-5px_25px_rgba(0,0,0,0.8)] pb-safe">
+        <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-[#171412]/98 backdrop-blur-xl border-t border-amber-900/50 px-2 py-3.5 flex items-center justify-between z-50 shadow-[0_-8px_30px_rgba(0,0,0,0.9)] pb-[max(1rem,env(safe-area-inset-bottom))]">
           <button
             onClick={() => {
               setMobileActiveTab("chat");
               setMainView("chat");
             }}
-            className={`flex flex-col items-center justify-center flex-1 py-1 transition-all active:scale-95 cursor-pointer ${
-              mobileActiveTab === "chat" ? "text-[#E9C46A] scale-105 font-extrabold" : "text-stone-400 font-semibold"
+            className={`flex flex-col items-center justify-center flex-1 transition-all active:scale-90 cursor-pointer ${
+              mobileActiveTab === "chat" ? "text-[#E9C46A] scale-110 font-black" : "text-stone-500 font-bold"
             }`}
           >
-            <MessageCircle size={18} className="mb-0.5" />
-            <span className="text-[9px] mt-0.5 tracking-tight uppercase font-mono">{_t("Obrolan", "Chat")}</span>
+            <MessageCircle size={22} className={mobileActiveTab === "chat" ? "mb-1 text-[#E9C46A] drop-shadow-[0_0_8px_rgba(233,196,106,0.5)]" : "mb-1 text-white/40"} />
+            <span className="text-[9px] uppercase tracking-widest font-sans">{_t("Obrolan", "Chat")}</span>
           </button>
 
           <button
@@ -3048,12 +3057,12 @@ export default function App() {
               setMobileActiveTab("rooms");
               setMainView("chat");
             }}
-            className={`flex flex-col items-center justify-center flex-1 py-1 transition-all active:scale-95 cursor-pointer ${
-              mobileActiveTab === "rooms" ? "text-[#E9C46A] scale-105 font-extrabold" : "text-stone-400 font-semibold"
+            className={`flex flex-col items-center justify-center flex-1 transition-all active:scale-90 cursor-pointer ${
+              mobileActiveTab === "rooms" ? "text-[#E9C46A] scale-110 font-black" : "text-stone-500 font-bold"
             }`}
           >
-            <Compass size={18} className="mb-0.5" />
-            <span className="text-[9px] mt-0.5 tracking-tight uppercase font-mono">{_t("Daftar Meja", "Rooms")}</span>
+            <Compass size={22} className={mobileActiveTab === "rooms" ? "mb-1 text-[#E9C46A] drop-shadow-[0_0_8px_rgba(233,196,106,0.3)]" : "mb-1 text-white/40"} />
+            <span className="text-[9px] uppercase tracking-widest font-sans">{_t("Meja", "Rooms")}</span>
           </button>
 
           <button
@@ -3061,12 +3070,12 @@ export default function App() {
               setMobileActiveTab("menu");
               setMainView("chat");
             }}
-            className={`flex flex-col items-center justify-center flex-1 py-1 transition-all active:scale-95 cursor-pointer ${
-              mobileActiveTab === "menu" ? "text-[#E9C46A] scale-105 font-extrabold" : "text-stone-400 font-semibold"
+            className={`flex flex-col items-center justify-center flex-1 transition-all active:scale-90 cursor-pointer ${
+              mobileActiveTab === "menu" ? "text-[#E9C46A] scale-110 font-black" : "text-stone-500 font-bold"
             }`}
           >
-            <ChefHat size={18} className="mb-0.5" />
-            <span className="text-[9px] mt-0.5 tracking-tight uppercase font-mono">{_t("Menu Warkol", "Menu")}</span>
+            <ChefHat size={22} className={mobileActiveTab === "menu" ? "mb-1 text-[#E9C46A] drop-shadow-[0_0_8px_rgba(233,196,106,0.3)]" : "mb-1 text-white/40"} />
+            <span className="text-[9px] uppercase tracking-widest font-sans">{_t("Menu", "Menu")}</span>
           </button>
 
           <button
@@ -3074,12 +3083,12 @@ export default function App() {
               setMobileActiveTab("chess");
               setMainView("chess");
             }}
-            className={`flex flex-col items-center justify-center flex-1 py-1 transition-all active:scale-95 cursor-pointer ${
-              mobileActiveTab === "chess" ? "text-[#E9C46A] scale-105 font-extrabold" : "text-stone-400 font-semibold"
+            className={`flex flex-col items-center justify-center flex-1 transition-all active:scale-90 cursor-pointer ${
+              mobileActiveTab === "chess" || mainView === "chess" ? "text-[#E9C46A] scale-110 font-black" : "text-stone-500 font-bold"
             }`}
           >
-            <Swords size={18} className="mb-0.5" />
-            <span className="text-[9px] mt-0.5 tracking-tight uppercase font-mono text-center leading-none">{_t("Pojok Catur", "Chess Corner")}</span>
+            <Swords size={22} className={mobileActiveTab === "chess" || mainView === "chess" ? "mb-1 text-[#E9C46A] drop-shadow-[0_0_8px_rgba(233,196,106,0.3)]" : "mb-1 text-white/40"} />
+            <span className="text-[9px] uppercase tracking-widest font-sans text-center leading-none">{_t("Catur", "Chess")}</span>
           </button>
 
           <button
@@ -3087,12 +3096,12 @@ export default function App() {
               setMobileActiveTab("profile");
               setMainView("chat");
             }}
-            className={`flex flex-col items-center justify-center flex-1 py-1 transition-all active:scale-95 cursor-pointer ${
-              mobileActiveTab === "profile" ? "text-[#E9C46A] scale-105 font-extrabold" : "text-stone-400 font-semibold"
+            className={`flex flex-col items-center justify-center flex-1 transition-all active:scale-90 cursor-pointer ${
+              mobileActiveTab === "profile" ? "text-[#E9C46A] scale-110 font-black" : "text-stone-500 font-bold"
             }`}
           >
-            <User size={18} className="mb-0.5" />
-            <span className="text-[9px] mt-0.5 tracking-tight uppercase font-mono">{_t("Profil", "Profile")}</span>
+            <User size={22} className={mobileActiveTab === "profile" ? "mb-1 text-[#E9C46A] drop-shadow-[0_0_8px_rgba(233,196,106,0.3)]" : "mb-1 text-white/40"} />
+            <span className="text-[9px] uppercase tracking-widest font-sans">{_t("Profil", "Profile")}</span>
           </button>
         </div>
       )}

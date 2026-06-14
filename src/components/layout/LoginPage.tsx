@@ -137,25 +137,25 @@ export const LoginPage: React.FC<LoginPageProps> = ({
       />
 
       {/* Form Container Panel */}
-      <div id="login-left-pane" className="col-span-12 md:col-span-5 h-[100dvh] md:h-full flex flex-col items-center justify-center p-3 xs:p-5 sm:p-8 relative z-10 bg-gradient-to-r from-black/90 via-black/40 to-transparent overflow-hidden">
-        <div className="w-full max-w-sm p-4 xs:p-6 sm:p-8 bg-black/55 backdrop-blur-md md:backdrop-blur-lg border border-white/10 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.95)] rounded-2xl relative overflow-hidden ring-1 ring-white/10 animate-fade-in-up flex flex-col justify-between max-h-[96dvh] sm:max-h-none overflow-y-auto warkop-scrollbar">
+      <div id="login-left-pane" className="col-span-12 md:col-span-5 h-[100dvh] md:h-full flex flex-col items-center justify-center p-4 xs:p-6 sm:p-8 relative z-10 bg-gradient-to-r from-black/95 via-black/50 to-transparent overflow-hidden">
+        <div className="w-full max-w-sm p-6 xs:p-8 sm:p-10 bg-black/60 backdrop-blur-xl md:backdrop-blur-2xl border border-white/10 shadow-[0_30px_70px_-15px_rgba(0,0,0,0.98)] rounded-[2rem] relative overflow-hidden ring-1 ring-white/15 animate-fade-in-up flex flex-col justify-between max-h-[94dvh] sm:max-h-none overflow-y-auto warkop-scrollbar">
           
-          <div className="absolute top-0 right-0 transform translate-x-3 -translate-y-3 w-28 h-28 bg-[#E9C46A]/5 rounded-full blur-3xl pointer-events-none"></div>
+          <div className="absolute top-0 right-0 transform translate-x-4 -translate-y-4 w-32 h-32 bg-[#E9C46A]/10 rounded-full blur-3xl pointer-events-none"></div>
           
           {/* Logo & Subtitle */}
-          <div className="text-center mb-3 sm:mb-5 flex flex-col items-center shrink-0">
+          <div className="text-center mb-5 sm:mb-7 flex flex-col items-center shrink-0">
             <img
               src="https://imgur.com/m16hDt0.jpg"
               alt="WARKOL Logo"
-              className="h-14 xs:h-16 sm:h-24 w-auto object-contain mb-2 animate-bounce [animation-duration:8s]"
+              className="h-16 xs:h-20 sm:h-28 w-auto object-contain mb-3 animate-bounce [animation-duration:10s]"
               referrerPolicy="no-referrer"
             />
 
-            <span className="text-[7.5px] sm:text-[8.5px] font-mono tracking-[0.1em] sm:tracking-[0.15em] font-black text-[#E9C46A] bg-amber-500/15 px-2.5 py-0.5 rounded-full border border-amber-500/20 inline-block uppercase select-none">
+            <span className="text-[8px] sm:text-[9.5px] font-mono tracking-[0.12em] sm:tracking-[0.18em] font-black text-[#E9C46A] bg-amber-500/20 px-3 py-1 rounded-full border border-amber-500/30 inline-block uppercase select-none shadow-sm">
               ☕ Warkop Online Pertama di Indonesia
             </span>
 
-            <span className="mt-1 sm:mt-2 bg-red-650/90 text-white font-sans font-black text-[6.5px] sm:text-[7.5px] px-1.5 sm:px-2 py-0.5 rounded border border-red-500/30 tracking-wider uppercase shadow-[0_2px_8px_rgba(220,38,38,0.4)] select-none animate-pulse">
+            <span className="mt-2 sm:mt-3 bg-red-600/90 text-white font-sans font-black text-[7.5px] sm:text-[8.5px] px-2 sm:px-3 py-1 rounded-md border border-red-500/40 tracking-wider uppercase shadow-[0_4px_12px_rgba(220,38,38,0.5)] select-none animate-pulse">
               🔴 Buka 24 Jam
             </span>
           </div>
@@ -206,7 +206,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                     placeholder="contoh@gmail.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl pl-3 pr-3 py-2 sm:py-2.5 text-[11px] sm:text-xs text-white placeholder-stone-600 focus:outline-none focus:ring-1 focus:ring-amber-500/50 focus:border-amber-500 transition-all font-sans font-semibold"
+                    className="w-full bg-white/5 border border-white/10 rounded-2xl pl-4 pr-4 py-3 sm:py-3.5 text-xs sm:text-sm text-white placeholder-stone-600 focus:outline-none focus:ring-1 focus:ring-amber-500/50 focus:border-amber-500 transition-all font-sans font-semibold"
                   />
                 </div>
               </div>
@@ -225,7 +225,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                       placeholder="••••••••"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 sm:py-2.5 text-[11px] sm:text-xs text-white placeholder-stone-600 focus:outline-none focus:ring-1 focus:ring-amber-500/50 focus:border-amber-500 transition-all font-sans"
+                      className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 sm:py-3.5 text-xs sm:text-sm text-white placeholder-stone-600 focus:outline-none focus:ring-1 focus:ring-amber-500/50 focus:border-amber-500 transition-all font-sans"
                     />
                   </div>
                 </div>
@@ -245,7 +245,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                       placeholder="••••••••"
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
-                      className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 sm:py-2.5 text-[11px] sm:text-xs text-white placeholder-stone-600 focus:outline-none focus:ring-1 focus:ring-amber-500/50 focus:border-amber-500 transition-all font-sans"
+                      className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 sm:py-3.5 text-xs sm:text-sm text-white placeholder-stone-600 focus:outline-none focus:ring-1 focus:ring-amber-500/50 focus:border-amber-500 transition-all font-sans"
                     />
                   </div>
                 </div>
@@ -255,7 +255,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
               <button
                 type="submit"
                 disabled={simulatedLoading}
-                className="w-full mt-2 sm:mt-4 bg-[#E9C46A] hover:bg-amber-400 disabled:opacity-50 text-neutral-900 font-black py-2 sm:py-2.5 rounded-xl transition-all shadow-md hover:shadow-lg hover:shadow-amber-500/10 active:scale-95 flex items-center justify-center gap-2 uppercase text-[9px] sm:text-[10px] tracking-widest group"
+                className="w-full mt-4 sm:mt-6 bg-[#E9C46A] hover:bg-amber-400 disabled:opacity-50 text-neutral-900 font-black py-3 sm:py-3.5 rounded-2xl transition-all shadow-md hover:shadow-lg hover:shadow-amber-500/10 active:scale-95 flex items-center justify-center gap-2 uppercase text-[10px] sm:text-[11px] tracking-[0.15em] group"
               >
                 {simulatedLoading ? (
                   <div className="w-3.5 h-3.5 border-2 border-neutral-950 border-t-transparent rounded-full animate-spin"></div>
