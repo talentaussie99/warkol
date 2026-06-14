@@ -17,8 +17,10 @@ CREATE TABLE IF NOT EXISTS meja (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Matikan RLS agar bebas diakses publik untuk demo/simulasi
+-- Pastikan RLS dimatikan atau ada kebijakan publik untuk demo
 ALTER TABLE meja DISABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Public access meja" ON meja;
+CREATE POLICY "Public access meja" ON meja FOR ALL USING (true) WITH CHECK (true);
 
 -- Aktifkan Realtime untuk meja
 ALTER TABLE meja REPLICA IDENTITY FULL;
@@ -45,6 +47,8 @@ CREATE TABLE IF NOT EXISTS pengunjung (
 );
 
 ALTER TABLE pengunjung DISABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Public access pengunjung" ON pengunjung;
+CREATE POLICY "Public access pengunjung" ON pengunjung FOR ALL USING (true) WITH CHECK (true);
 ALTER TABLE pengunjung REPLICA IDENTITY FULL;
 
 
@@ -64,6 +68,8 @@ CREATE TABLE IF NOT EXISTS linimasa_posts (
 );
 
 ALTER TABLE linimasa_posts DISABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Public access posts" ON linimasa_posts;
+CREATE POLICY "Public access posts" ON linimasa_posts FOR ALL USING (true) WITH CHECK (true);
 ALTER TABLE linimasa_posts REPLICA IDENTITY FULL;
 
 
@@ -80,6 +86,8 @@ CREATE TABLE IF NOT EXISTS linimasa_comments (
 );
 
 ALTER TABLE linimasa_comments DISABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Public access comments" ON linimasa_comments;
+CREATE POLICY "Public access comments" ON linimasa_comments FOR ALL USING (true) WITH CHECK (true);
 ALTER TABLE linimasa_comments REPLICA IDENTITY FULL;
 
 
@@ -99,6 +107,8 @@ CREATE TABLE IF NOT EXISTS notifications (
 );
 
 ALTER TABLE notifications DISABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Public access notifications" ON notifications;
+CREATE POLICY "Public access notifications" ON notifications FOR ALL USING (true) WITH CHECK (true);
 ALTER TABLE notifications REPLICA IDENTITY FULL;
 
 
@@ -119,6 +129,8 @@ CREATE TABLE IF NOT EXISTS pesan_chat (
 );
 
 ALTER TABLE pesan_chat DISABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Public access pesan_chat" ON pesan_chat;
+CREATE POLICY "Public access pesan_chat" ON pesan_chat FOR ALL USING (true) WITH CHECK (true);
 ALTER TABLE pesan_chat REPLICA IDENTITY FULL;
 
 

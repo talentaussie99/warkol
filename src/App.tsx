@@ -208,14 +208,19 @@ export default function App() {
           .eq("id", currentUserId)
           .maybeSingle();
         
-        if (!data) {
+        if (error) {
+          console.error("Gagal mengambil profil pengunjung (Mungkin kendala RLS):", error);
+        }
+
+        if (!data && !error) {
            // Fallback attempt migration from old email-based ID
-           const { data: oldData } = await supabase
+           const { data: oldData, error: oldError } = await supabase
              .from("pengunjung")
              .select("name, status, avatar, name_changes, saldo, hunger, thirst, inventory")
              .eq("id", `visitor-${defaultNick}`)
              .maybeSingle();
            if (oldData) data = oldData;
+           if (oldError) console.error("Gagal mengambil profil lama:", oldError);
         }
 
         if (!active) return;
@@ -232,20 +237,26 @@ export default function App() {
           setHunger(data.hunger ?? 100);
           setThirst(data.thirst ?? 100);
           setFoodInventory(data.inventory ?? []);
-        } else {
-          // New user defaults
+          setIsProfileLoaded(true);
+        } else if (!error) {
+          // New user defaults - only set if it's truly a "not found" scenario, not a db error
           setUserName(defaultNick);
           setUserStatus("☕ Lagi Ngopi");
           setSaldo(20000);
           setHunger(100);
           setThirst(100);
           setFoodInventory([]);
+          setIsProfileLoaded(true);
+        } else {
+          // If there's an error (like RLS), we don't set isProfileLoaded to true
+          // This prevents the sync effect from overwriting existing data with empty defaults
+          console.warn("Profil tidak diload karena ada gangguan koneksi/database. Sinkronisasi dimatikan sementara.");
         }
 
-        setIsProfileLoaded(true);
-
-        if (!localStorage.getItem("tutorial_done")) {
-          setShowTutorial(true);
+        if (data || !error) {
+          if (!localStorage.getItem("tutorial_done")) {
+            setShowTutorial(true);
+          }
         }
       } else {
         if (!active) return;
@@ -266,8 +277,14 @@ export default function App() {
   useEffect(() => {
     const fetchRooms = async () => {
       const { data, error } = await supabase.from("meja").select("*").order("created_at", { ascending: true });
+      
+      if (error) {
+        console.error("Gagal mengambil data Meja dari database:", error);
+      }
+
+      let mapped: Meja[] = [];
       if (!error && data) {
-        const mapped: Meja[] = data.map((d: any) => ({
+        mapped = data.map((d: any) => ({
           id: d.id,
           name: d.name,
           icon: d.icon || "☕",
@@ -278,8 +295,9 @@ export default function App() {
           invitedUsers: d.invited_users || [],
           code: d.code || null
         }));
+      }
         
-        if (!mapped.some(t => t.id === TableId.SANTAI)) {
+      if (!mapped.some(t => t.id === TableId.SANTAI)) {
           const defaultMeja = {
             id: TableId.SANTAI,
             name: "Obrolan Terbuka Umum",
@@ -303,7 +321,6 @@ export default function App() {
           });
         }
         setTables(mapped);
-      }
     };
 
     fetchRooms();
