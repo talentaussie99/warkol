@@ -14,6 +14,7 @@ import {
   BookOpen, 
   MessageSquare,
   Smile,
+  AtSign,
   DollarSign,
   User,
   Heart,
@@ -95,12 +96,14 @@ export default function App() {
   // Notifications State
   const [notifications, setNotifications] = useState<{
     id: string;
-    type: "like" | "comment";
+    type: "like" | "comment" | "tag" | "chess_challenge";
     sender: string;
-    postId: string;
-    content: string;
+    sender_id?: string;
+    postId: string; // Used for message_id or post_id
+    content: string; // Used for table_id or other metadata
     timestamp: string;
     isRead: boolean;
+    created_at?: string;
   }[]>([]);
 
   // The Sims-style hunger & thirst states
@@ -126,6 +129,11 @@ export default function App() {
   const [newRoomIcon, setNewRoomIcon] = useState("☕");
   const [newRoomInviteUsername, setNewRoomInviteUsername] = useState("");
   
+  // Mention suggestion state
+  const [mentionSuggestions, setMentionSuggestions] = useState<any[]>([]);
+  const [showMentionList, setShowMentionList] = useState(false);
+  const [mentionQuery, setMentionQuery] = useState("");
+
   // Input fields
   const [newMsgText, setNewMsgText] = useState("");
   
@@ -257,9 +265,10 @@ export default function App() {
         }
 
         if (data || !error) {
-          if (localStorage.getItem("tutorial_done") !== "true") {
-            setShowTutorial(true);
-          }
+          // Tutorial disabled as per user request
+          // if (localStorage.getItem("tutorial_done") !== "true") {
+          //   setShowTutorial(true);
+          // }
         }
       } else {
         if (!active) return;
@@ -374,6 +383,7 @@ export default function App() {
           grouped[m.table_id].push({
             id: m.id,
             sender: m.sender,
+            sender_id: m.sender_id,
             text: m.text,
             role: m.role as any,
             tag: m.tag || (m.role === "admin" ? "Suhu" : "Warga"),
@@ -511,21 +521,27 @@ export default function App() {
 
   // 5. Load notifications and listen live
   useEffect(() => {
+    if (!isLoggedIn || !userId) return;
+
     const fetchNotifications = async () => {
       const { data, error } = await supabase
         .from("notifications")
         .select("*")
-        .order("created_at", { ascending: false });
+        .eq("recipient_id", userId)
+        .order("created_at", { ascending: false })
+        .limit(30);
 
       if (!error && data) {
         setNotifications(data.map((n: any) => ({
           id: n.id,
           type: n.type as any,
           sender: n.sender,
+          sender_id: n.sender_id,
           postId: n.post_id,
           content: n.content,
           timestamp: n.timestamp,
-          isRead: n.is_read
+          isRead: n.is_read,
+          created_at: n.created_at
         })));
       }
     };
@@ -533,8 +549,13 @@ export default function App() {
     fetchNotifications();
 
     const channel = supabase
-      .channel("notifications-db-live")
-      .on("postgres_changes", { event: "*", schema: "public", table: "notifications" }, () => {
+      .channel(`notifs-${userId}`)
+      .on("postgres_changes", { 
+        event: "INSERT", 
+        schema: "public", 
+        table: "notifications",
+        filter: `recipient_id=eq.${userId}` 
+      }, () => {
         fetchNotifications();
       })
       .subscribe();
@@ -542,7 +563,7 @@ export default function App() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [isLoggedIn, userId]);
 
   // 6. Load pengunjung (online status) and register ourselves
   useEffect(() => {
@@ -966,6 +987,10 @@ export default function App() {
             senderPin: msg.senderPin || "",
             to: msg.to
           });
+          // Auto-expire challenge after 15s
+          setTimeout(() => {
+            setIncomingChessChallenge(prev => (prev && prev.senderPin === (msg.senderPin || "")) ? null : prev);
+          }, 15000);
         }
       } else if (msg.type === "CHESS_INVITE_RESPONSE") {
         // If someone responded to our challenge and accepted, start multiplayer
@@ -1035,6 +1060,23 @@ export default function App() {
     }, 1000);
     return () => clearInterval(interval);
   }, [cooldownRemaining]);
+
+  const jumpToMessage = (msgId: string, tableId: string) => {
+    setMainView("chat");
+    setMobileActiveTab("chat");
+    setActiveTableId(tableId);
+    setDashboardTab("obrolan");
+    setTimeout(() => {
+      const el = document.getElementById(`msg-${msgId}`);
+      if (el) {
+         el.scrollIntoView({ behavior: "smooth", block: "center" });
+         el.classList.add("ring-2", "ring-amber-500", "ring-offset-2", "ring-offset-black", "rounded-md");
+         setTimeout(() => {
+           el.classList.remove("ring-2", "ring-amber-500", "ring-offset-2", "ring-offset-black");
+         }, 3000);
+      }
+    }, 600);
+  };
 
   const formatActiveDuration = (totalSeconds: number) => {
     const minutes = Math.floor(totalSeconds / 60);
@@ -1261,6 +1303,36 @@ export default function App() {
     }));
   };
 
+  const handleMentionSearch = (text: string) => {
+    const lastAtIndex = text.lastIndexOf("@");
+    if (lastAtIndex !== -1) {
+      const textAfterAt = text.substring(lastAtIndex + 1);
+      const spaceIndex = textAfterAt.indexOf(" ");
+      
+      if (spaceIndex === -1) { 
+        setMentionQuery(textAfterAt);
+        const filtered = pengunjung.filter(p => 
+          p.name.toLowerCase().includes(textAfterAt.toLowerCase()) && 
+          p.name.toLowerCase() !== userName.toLowerCase()
+        ).slice(0, 5);
+        setMentionSuggestions(filtered);
+        setShowMentionList(filtered.length > 0);
+      } else {
+        setShowMentionList(false);
+      }
+    } else {
+      setShowMentionList(false);
+    }
+  };
+
+  const insertMention = (selectedName: string) => {
+    const lastAtIndex = newMsgText.lastIndexOf("@");
+    const prefix = newMsgText.substring(0, lastAtIndex);
+    const newVal = prefix + "@" + selectedName + " ";
+    setNewMsgText(newVal);
+    setShowMentionList(false);
+  };
+
   // Send Message logic
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1310,6 +1382,10 @@ export default function App() {
     const originalMsg = newMsgText.trim();
     setNewMsgText("");
 
+    // Detect Mentions
+    const mentions = originalMsg.match(/@([\w\d-]+)/g);
+    const nowStampForNotif = new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
+
     // Save to Supabase
     const userMsgId = `user-${Date.now()}`;
     const userMsgObj = {
@@ -1324,6 +1400,29 @@ export default function App() {
       color: "text-[#E9C46A] bg-amber-950/70 border-amber-500"
     };
 
+    if (mentions) {
+      mentions.forEach(async (m) => {
+        const targetName = m.substring(1);
+        const targetUser = pengunjung.find(p => 
+          p.name.toLowerCase() === targetName.toLowerCase() || 
+          (p.pin && p.pin.toLowerCase() === targetName.toLowerCase())
+        );
+        if (targetUser && targetUser.id !== userId) {
+           await supabase.from("notifications").insert({
+             id: `tag-${Date.now()}-${Math.floor(Math.random()*1000)}`,
+             type: "tag",
+             sender: userName,
+             sender_id: userId,
+             recipient_id: targetUser.id,
+             post_id: userMsgId,
+             content: activeTableId, // Store table_id
+             timestamp: nowStampForNotif,
+             is_read: false
+           });
+        }
+      });
+    }
+
     // Append instantly to local state to avoid database sync lag
     setChats(prev => ({
       ...prev,
@@ -1332,6 +1431,7 @@ export default function App() {
         {
           id: userMsgObj.id,
           sender: userMsgObj.sender,
+          sender_id: userMsgObj.sender_id,
           text: userMsgObj.text,
           role: userMsgObj.role as any,
           tag: userMsgObj.tag,
@@ -1845,16 +1945,11 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => {
-                    setDashboardTab("linimasa");
-                    setPreviousTab("linimasa");
+                    alert("Fitur Papan Cerita belum tersedia kawan!");
                   }}
-                  className={`py-2.5 px-2 rounded-lg flex flex-row items-center justify-center gap-1.5 transition-all cursor-pointer select-none ${
-                    dashboardTab === "linimasa"
-                      ? "bg-[#E9C46A] text-neutral-900 font-extrabold shadow-[0_2px_10px_rgba(233,196,106,0.25)] scale-[1.01]"
-                      : "text-stone-400 hover:text-stone-200 hover:bg-white/5 font-semibold"
-                  }`}
+                  className={`py-2.5 px-2 rounded-lg flex flex-row items-center justify-center gap-1.5 transition-all cursor-pointer select-none text-stone-400 hover:text-stone-200 hover:bg-white/5 font-semibold opacity-50`}
                 >
-                  <Sparkles size={14} className={dashboardTab === "linimasa" ? "text-neutral-900" : "text-amber-400"} />
+                  <Sparkles size={14} className="text-amber-400" />
                   <span className="text-[10px] uppercase tracking-wider">{_t("Papan Cerita", "Story Board")}</span>
                 </button>
               </div>
@@ -2052,6 +2147,25 @@ export default function App() {
                 {_t("Klik 2x untuk membeli", "Double click to buy")}
               </span>
             </div>
+
+            {/* Mobile-only Balance Bar */}
+            {isLoggedIn && (
+               <div className="lg:hidden flex items-center justify-between bg-black/45 border border-amber-500/20 rounded-lg px-3 py-2.5 mb-3 shadow-inner">
+                  <div className="flex flex-col">
+                    <span className="text-[7.5px] font-mono text-stone-500 uppercase tracking-tighter">ISI DOMPET (SALDO)</span>
+                    <span className="text-xs font-black text-amber-400 font-sans tracking-wide">Rp {Number(saldo).toLocaleString("id-ID")}</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <div className="flex flex-col items-end">
+                      <span className="text-[7.5px] font-mono text-stone-500 uppercase tracking-tighter">PERUT</span>
+                      <div className="h-1 w-12 bg-white/5 rounded-full overflow-hidden mt-0.5 border border-white/5">
+                        <div className={`h-full ${hunger > 30 ? 'bg-emerald-500' : 'bg-rose-500'} transition-all`} style={{ width: `${hunger}%` }} />
+                      </div>
+                    </div>
+                  </div>
+               </div>
+            )}
+
             <p className="text-[10px] text-white/40 mb-3 font-mono leading-relaxed">{_t("Pesan virtual ala-ala (hidangan simulasi, tidak benar-benar disajikan ya kawan!).", "Virtual orders (simulated menu, not real!).")}</p>
 
             {/* Delay/Warning Alert */}
@@ -2146,16 +2260,11 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => {
-                    setDashboardTab("linimasa");
-                    setPreviousTab("linimasa");
+                    alert("Fitur Papan Cerita belum tersedia kawan!");
                   }}
-                  className={`py-2 px-2 rounded-lg flex flex-row items-center justify-center gap-1.5 transition-all cursor-pointer select-none ${
-                    dashboardTab === "linimasa"
-                      ? "bg-[#E9C46A] text-[#151515] font-extrabold"
-                      : "text-stone-400 font-semibold"
-                  }`}
+                  className={`py-2 px-2 rounded-lg flex flex-row items-center justify-center gap-1.5 transition-all cursor-pointer select-none text-stone-400 font-semibold opacity-50`}
                 >
-                  <Sparkles size={13} className={dashboardTab === "linimasa" ? "text-[#151515]" : "text-amber-400"} />
+                  <Sparkles size={13} className="text-amber-400" />
                   <span className="text-[10px] uppercase tracking-wider">{_t("Papan Cerita", "Story Board")}</span>
                 </button>
               </div>
@@ -2576,34 +2685,81 @@ export default function App() {
                       <p className="text-xs text-stone-500 font-sans italic">{_t("Belum ada kabar baru hari ini, kawan.", "No new news today, buddy.")}</p>
                     </div>
                   ) : (
-                    notifications.map((notif) => (
-                      <div key={notif.id} className="p-3 bg-black/30 border border-white/5 rounded-xl flex items-start gap-3 hover:bg-white/5 transition-colors cursor-default group">
-                        <div className={`mt-1 p-2 rounded-lg flex items-center justify-center shrink-0 ${notif.type === 'like' ? 'bg-rose-500/10 text-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.1)]' : 'bg-blue-500/10 text-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.1)]'}`}>
-                          {notif.type === 'like' ? <Heart size={14} fill="currentColor" /> : <MessageSquare size={14} fill="currentColor" />}
-                        </div>
-                        <div className="flex-1 flex flex-col gap-1">
-                          <p className="text-[11px] leading-relaxed">
-                            <span className="font-bold text-stone-200 hover:text-amber-400 cursor-pointer transition-colors">@{notif.sender}</span>
-                            {" "}<span className="text-stone-400">{notif.content}</span>
-                          </p>
-                          <div className="flex items-center justify-between">
-                            <span className="text-[9px] font-mono text-stone-600 uppercase tracking-tight">{notif.timestamp}</span>
-                            <button 
-                              onClick={() => setDashboardTab("linimasa")}
-                              className="text-[9px] font-black text-amber-500/60 hover:text-amber-400 uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-                            >
-                              {_t("LIHAT POST", "VIEW")}
-                            </button>
+                     notifications.map((notif) => {
+                       const isOldChallenge = notif.type === 'chess_challenge' && notif.created_at && (Date.now() - new Date(notif.created_at).getTime() > 15000);
+                       if (isOldChallenge) return null;
+
+                       return (
+                        <div key={notif.id} className="p-3 bg-black/30 border border-white/5 rounded-xl flex items-start gap-3 hover:bg-white/5 transition-colors cursor-default group">
+                          <div className={`mt-1 p-2 rounded-lg flex items-center justify-center shrink-0 ${
+                            notif.type === 'like' ? 'bg-rose-500/10 text-rose-500' : 
+                            notif.type === 'tag' ? 'bg-amber-500/10 text-amber-500 shadow-[0_0_10px_rgba(233,196,106,0.1)]' : 
+                            'bg-blue-500/10 text-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.1)]'
+                          }`}>
+                            {notif.type === 'like' ? <Heart size={14} fill="currentColor" /> : notif.type === 'tag' ? <AtSign size={14} /> : <MessageSquare size={14} fill="currentColor" />}
+                          </div>
+                          <div className="flex-1 flex flex-col gap-1">
+                            <p className="text-[11px] leading-relaxed">
+                              <span className="font-bold text-stone-200 hover:text-amber-400 cursor-pointer transition-colors">@{notif.sender}</span>
+                              {" "}<span className="text-stone-400">
+                                {notif.type === 'tag' ? _t("menandai kamu di obrolan.", "tagged you in a chat.") : notif.content}
+                              </span>
+                            </p>
+                            <div className="flex items-center justify-between">
+                              <span className="text-[9px] font-mono text-stone-600 uppercase tracking-tight">{notif.timestamp}</span>
+                              {notif.type === 'tag' ? (
+                                <button 
+                                  onClick={() => jumpToMessage(notif.postId, notif.content)}
+                                  className="text-[9px] font-black text-amber-500/80 hover:text-amber-400 uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer flex items-center gap-1"
+                                >
+                                  {_t("LIHAT PESAN", "VIEW MESSAGE")}
+                                </button>
+                              ) : (
+                                <button 
+                                  onClick={() => setDashboardTab("linimasa")}
+                                  className="text-[9px] font-black text-amber-500/60 hover:text-amber-400 uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                                >
+                                  {_t("LIHAT POST", "VIEW")}
+                                </button>
+                              )}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))
+                       );
+                     })
                   )}
                 </div>
               </div>
             )}
             {dashboardTab === "obrolan" && (
               <div className="immersive-card flex flex-col relative overflow-hidden transition-all duration-300 h-[900px]">
+
+                 {/* Mention Suggestion List */}
+                 {showMentionList && mentionSuggestions.length > 0 && (
+                   <div className="absolute top-[120px] left-4 right-4 bg-[#1a1816] border border-amber-500/30 rounded-lg shadow-2xl z-[60] overflow-hidden animate-slide-up-faint max-w-sm mx-auto sm:mx-0">
+                     <div className="px-2 py-1 bg-amber-500/10 border-b border-amber-500/20 text-[8px] font-black uppercase text-amber-400 tracking-widest">
+                       🏷️ {_t("Tag Warga", "Tag Citizens")}
+                     </div>
+                     <div className="flex flex-col max-h-[150px] overflow-y-auto warkop-scrollbar">
+                       {mentionSuggestions.map((p) => (
+                         <button
+                           key={p.id}
+                           type="button"
+                           onClick={() => insertMention(p.name)}
+                           className="flex items-center gap-2 px-3 py-2 hover:bg-amber-500/20 text-left transition-colors border-b border-white/5 last:border-0 cursor-pointer w-full"
+                         >
+                           <div className="w-5 h-5 rounded-full overflow-hidden flex-shrink-0 border border-amber-500/20 bg-amber-950/40 flex items-center justify-center text-[10px]">
+                              {p.name.charAt(0).toUpperCase()}
+                           </div>
+                           <div className="flex flex-col min-w-0">
+                             <span className="text-xs font-bold text-amber-100 truncate">@{p.name}</span>
+                             <span className="text-[8px] text-zinc-500 truncate font-mono">{p.status}</span>
+                           </div>
+                         </button>
+                       ))}
+                     </div>
+                   </div>
+                 )}
 
                 {/* INTEGRATED OBROLAN HARI INI */}
                 <div className="px-4 py-2.5 border-b border-white/5 bg-[#1f1d1a] flex-shrink-0">
@@ -2829,8 +2985,10 @@ export default function App() {
                      }
                      value={newMsgText}
                      onChange={(e) => {
+                       const val = e.target.value;
                        if (isLoggedIn && hunger > 10 && thirst > 10) {
-                         setNewMsgText(e.target.value);
+                         setNewMsgText(val);
+                         handleMentionSearch(val);
                        }
                      }}
                      className={`flex-1 border bg-[#232323] px-3 py-1.5 text-xs text-white placeholder-white/30 focus:outline-none focus:border-amber-700/80 font-sans cursor-pointer ${
@@ -2859,11 +3017,13 @@ export default function App() {
                       const reportCount = messageReports[msg.id] || 0;
                       if (reportCount > 10) return null; // Automatic high-report hiding
 
-                      const isUser = msg.role === "user";
+                      // Identifikasi apakah ini pesan milik sendiri atau orang lain
+                      const isMe = (msg.sender_id === userId && !!userId) || (msg.sender === userName && msg.role === "user");
                       const isAdmin = msg.role === "admin";
+                      const isOther = !isMe && !isAdmin;
                       
                       // Highlight condition when current user is tagged in a message from others
-                      const isUserTagged = !isUser && (
+                      const isUserTagged = isOther && (
                         msg.text.toLowerCase().includes(`@${userName.toLowerCase()}`) ||
                         msg.text.toLowerCase().includes("@kamu")
                       );
@@ -2871,14 +3031,29 @@ export default function App() {
                       return (
                         <div
                           key={msg.id}
+                          id={`msg-${msg.id}`}
                           className={`flex flex-col max-w-[85%] transition-all ${
-                            isUser ? "ml-auto items-end" : "items-start"
+                            isMe ? "ml-auto items-end" : "items-start"
                           } ${
                             isUserTagged 
                               ? "border-l-3 border-amber-500 bg-amber-500/5 p-2 rounded-r-lg shadow-[0_0_15px_rgba(233,196,106,0.12)] border border-[#524436]" 
                               : ""
                           }`}
                         >
+                          {/* Nama Pengirim Di Atas Bubble untuk User Lain */}
+                          {isOther && (
+                            <div className="flex items-center gap-1.5 mb-0.5 ml-1">
+                              <span className="text-[10px] font-sans font-bold text-[#D4A373] tracking-wide">
+                                {msg.sender}
+                              </span>
+                              {msg.tag && (
+                                <span className={`px-1 rounded-[3px] text-[7px] font-black uppercase border ${msg.color || "bg-[#2d2d2d] text-white/50 border-white/5"}`}>
+                                  {msg.tag}
+                                </span>
+                              )}
+                            </div>
+                          )}
+
                           {/* Message tag notification */}
                           {isUserTagged && (
                             <span className="text-[8.5px] font-mono font-bold text-amber-400 flex items-center gap-1 mb-1 animate-pulse uppercase tracking-widest">
@@ -2886,43 +3061,44 @@ export default function App() {
                             </span>
                           )}
 
-                          {/* Message header details */}
-                          <div className="flex items-center gap-1.5 mb-1 text-[10px] font-mono flex-wrap">
-                            {!isUser && (
-                              <span className="text-[#D4A373] font-semibold">{getDisplaySender(msg.sender)}</span>
+                          {/* Message header details (Timestamp, etc) */}
+                          <div className={`flex items-center gap-1.5 mb-1 text-[9px] font-mono flex-wrap ${isMe ? "justify-end" : "justify-start"}`}>
+                            {isAdmin && (
+                              <>
+                                <span className="text-[#E9C46A] font-bold">{msg.sender}</span>
+                                <span className="bg-amber-950/80 text-[#E9C46A] border-amber-900 px-1.5 py-0.2 rounded text-[8px] tracking-wide border font-bold">
+                                  {msg.tag || "Sistem"}
+                                </span>
+                              </>
                             )}
-                            {msg.tag && (
-                              <span className={`px-1.5 py-0.2 rounded text-[8px] tracking-wide border font-bold ${
-                                isAdmin 
-                                  ? "bg-amber-950/80 text-[#E9C46A] border-amber-900" 
-                                  : isUser
-                                    ? "bg-[#D4A373] text-neutral-900 border-amber-800/10"
-                                    : msg.color || "bg-[#2d2d2d] text-white/50 border-white/5"
-                              }`}>
+                            {isMe && msg.tag && (
+                              <span className="bg-[#D4A373] text-neutral-900 border-amber-800/10 px-1.5 py-0.2 rounded text-[8px] tracking-wide border font-bold">
                                 {msg.tag}
                               </span>
                             )}
-                            <span className="text-white/30 text-[8.5px] font-medium">{msg.timestamp}</span>
+                            <span className="text-white/20 font-medium">{msg.timestamp}</span>
 
                             {/* Flag / Report Button */}
-                            <button
-                              type="button"
-                              onClick={() => {
-                                if (ensureAuth(_t("melaporkan pesan", "reporting a message"))) {
-                                  setReportingMessage(msg);
-                                  setSelectedReportReason("");
-                                  setReportSuccessFeedback(false);
-                                }
-                              }}
-                              className="text-stone-500 hover:text-red-400 p-0.5 rounded transition-colors cursor-pointer ml-1 flex items-center justify-center transform hover:scale-110 active:scale-95"
-                              title="Laporkan pesan ini kawan"
-                            >
-                              <Flag size={9.5} className="fill-transparent hover:fill-red-500/10" />
-                            </button>
+                            {!isMe && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (ensureAuth(_t("melaporkan pesan", "reporting a message"))) {
+                                    setReportingMessage(msg);
+                                    setSelectedReportReason("");
+                                    setReportSuccessFeedback(false);
+                                  }
+                                }}
+                                className="text-stone-600 hover:text-red-400 p-0.5 rounded transition-colors cursor-pointer ml-1 flex items-center justify-center transform hover:scale-110 active:scale-95"
+                                title="Laporkan pesan ini kawan"
+                              >
+                                <Flag size={8.5} className="fill-transparent hover:fill-red-500/10" />
+                              </button>
+                            )}
 
                             {/* Show report badge for test transparency */}
                             {reportCount > 0 && (
-                              <span className="text-[8.5px] font-semibold font-mono text-rose-450 bg-rose-950/50 border border-rose-900/35 px-1 py-0.2 rounded ml-0.5 flex items-center justify-center gap-0.5" title={`${reportCount} laporan warga kawan`}>
+                              <span className="text-[8px] font-bold font-mono text-rose-450 bg-rose-950/50 border border-rose-900/35 px-1 py-0.2 rounded ml-0.5 flex items-center justify-center gap-0.5" title={`${reportCount} laporan warga kawan`}>
                                 🚩 {reportCount}
                               </span>
                             )}
@@ -2931,23 +3107,23 @@ export default function App() {
                           {/* Message body bubbles */}
                           <div
                             className={`p-2.5 rounded text-xs font-sans whitespace-pre-wrap leading-relaxed relative group ${
-                              isUser
+                              isMe
                                 ? "bg-[#D4A373] text-neutral-900 font-medium rounded-tr-none"
                                 : isAdmin
-                                  ? "bg-amber-950/15 border border-amber-900/30 text-amber-200/95 font-mono"
-                                  : "bg-[#232323] text-gray-200 font-normal rounded-tl-none border border-white/5"
+                                  ? "bg-amber-950/20 border border-amber-900/40 text-amber-200/95 font-mono shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)]"
+                                  : "bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 font-medium rounded-tl-none shadow-[0_0_10px_rgba(16,185,129,0.05)]"
                             }`}
-                            style={{ borderRadius: "8px" }}
+                            style={{ borderRadius: isMe ? "12px 2px 12px 12px" : "2px 12px 12px 12px" }}
                           >
                             {msg.isWithdrawn ? (
                               <span className="italic opacity-50 flex items-center gap-1.5 grayscale text-[10px]">
                                 <span className="rotate-12 select-none">↩️</span>
-                                {userName === msg.sender ? _t("Pesan ini telah kamu tarik, kawan", "You have withdrawn this message, friend") : _t("Pesan ini telah ditarik oleh pengirim", "This message has been withdrawn by the sender")}
+                                {isMe ? _t("Pesan ini telah kamu tarik, kawan", "You have withdrawn this message, friend") : _t("Pesan ini telah ditarik oleh pengirim", "This message has been withdrawn by the sender")}
                               </span>
                             ) : (
                               <>
                                 {renderMessageTextWithTags(msg.text, userName)}
-                                {isUser && (
+                                {isMe && (
                                   <button
                                     onClick={() => handleWithdrawMessage(msg.id)}
                                     className="absolute -left-20 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity bg-black/40 text-stone-400 border border-white/10 px-1.5 py-0.5 rounded text-[8px] font-mono hover:bg-rose-500 hover:text-white cursor-pointer z-20 shadow-sm"
@@ -3183,7 +3359,7 @@ export default function App() {
               </button>
               <button
                 onClick={() => setSettingsTab("support")}
-                className={`px-3 py-1.5 rounded uppercase font-bold transition-colors ${settingsTab === "support" ? "bg-rose-500/15 text-rose-400 border border-rose-500/30" : "text-stone-450 hover:text-rose-200"}`}
+                className={`px-3 py-1.5 rounded uppercase font-bold transition-colors md:hidden ${settingsTab === "support" ? "bg-rose-500/15 text-rose-400 border border-rose-500/30" : "text-stone-450 hover:text-rose-200"}`}
               >
                 💝 {_t("Dukung", "Support")}
               </button>

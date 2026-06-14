@@ -711,7 +711,7 @@ export default function ChessBoard({
   }
 
   return (
-    <div id="catur-bapak-bapak" className="immersive-card p-4 w-full relative">
+    <div id="catur-bapak-bapak" className="immersive-card p-3 sm:p-4 w-full relative overflow-hidden">
       {/* If disabled, show blur overlay */}
       {disabled && (
         <div className="absolute inset-0 bg-[#141210]/95 backdrop-blur-sm z-50 flex flex-col items-center justify-center p-6 text-center select-none rounded-xl">
@@ -887,8 +887,8 @@ export default function ChessBoard({
       {/* Board & Info Grid */}
       <div className="flex flex-col md:flex-row gap-3">
         {/* The Wooden Styled Chessboard container - Rigid & Non-Shrinking */}
-        <div className="w-full md:w-[360px] max-w-[280px] sm:max-w-[320px] md:max-w-[360px] flex-shrink-0 mx-auto aspect-square select-none">
-          <div className="wooden-board-glass rounded p-1.5">
+        <div className="w-full md:w-[360px] flex-shrink-0 mx-auto aspect-square select-none mb-4 md:mb-0">
+          <div className="wooden-board-glass rounded p-1 md:p-1.5 h-full">
             <div className="grid grid-cols-8 grid-rows-8 w-full h-full relative" style={{ touchAction: "none" }}>
               {board.map((row, rIndex) => {
                 return row.map((square, cIndex) => {
@@ -960,10 +960,10 @@ export default function ChessBoard({
         </div>
 
         {/* Right Info pane */}
-        <div className="flex-1 flex flex-col justify-between">
-          <div className="space-y-2">
+        <div className="flex-1 flex flex-col justify-between pt-2 md:pt-0">
+          <div className="space-y-3 md:space-y-2">
             {/* Turn Indicators */}
-            <div className="bg-black/20 rounded p-2 border border-white/5 text-[11px] flex justify-between items-center">
+            <div className="bg-black/20 rounded p-2.5 border border-white/5 text-[11px] flex justify-between items-center shadow-lg">
               <span className="text-zinc-400 flex items-center gap-1.5">
                 {isCpuThinking ? (
                   <span className="flex h-2 w-2 relative">

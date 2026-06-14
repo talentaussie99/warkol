@@ -202,7 +202,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                     <div className="flex items-center gap-1.5">
                       <span className="text-xs text-amber-200 font-sans font-bold glow-yellow truncate block max-w-[120px]">{userName}</span>
                       <button 
-                        onClick={() => setIsEditingName(true)} 
+                        onClick={() => alert("Fitur ganti nama belum tersedia kawan!")} 
                         className="text-[9px] bg-white/5 hover:bg-white/10 text-white/50 hover:text-white px-1.5 py-0.2 rounded border border-white/10 cursor-pointer transition-colors"
                       >
                         {_t("Ubah", "Edit")}

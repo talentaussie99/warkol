@@ -22,6 +22,7 @@ export interface Meja {
 export interface Message {
   id: string;
   sender: string;
+  sender_id?: string;
   text: string;
   role: "user" | "guest" | "system" | "admin";
   tag?: string;
