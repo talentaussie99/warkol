@@ -107,7 +107,7 @@ ALTER TABLE notifications REPLICA IDENTITY FULL;
 -- ===================================================
 CREATE TABLE IF NOT EXISTS pesan_chat (
   id TEXT PRIMARY KEY,
-  table_id TEXT REFERENCES meja(id) ON DELETE CASCADE,
+  table_id TEXT,
   sender TEXT NOT NULL,
   text TEXT NOT NULL,
   role TEXT DEFAULT 'user',

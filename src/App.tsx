@@ -86,7 +86,7 @@ export default function App() {
   const [dashboardTab, setDashboardTab] = useState<"obrolan" | "linimasa" | "pemberitahuan">("obrolan");
   const [previousTab, setPreviousTab] = useState<"obrolan" | "linimasa">("obrolan");
   const [chats, setChats] = useState<Record<string, Message[]>>({});
-  const [tables, setTables] = useState<Meja[]>([]);
+  const [tables, setTables] = useState<Meja[]>(INITIAL_MEJA_LIST);
   const [pengunjung, setPengunjung] = useState<any[]>([]);
   const [currentQuoteIndex, setCurrentQuoteIndex] = useState(0);
   const [showBanner, setShowBanner] = useState(true);
@@ -354,6 +354,10 @@ export default function App() {
         .select("*")
         .order("created_at", { ascending: true });
 
+      if (error) {
+        console.error("Gagal mengambil pesan obrolan dari Supabase:", error);
+      }
+
       if (!error && data) {
         const botNamesLower = [
           "bang bakso", "om galon", "kang pecel", "bang soto", "om lele", "kang bubur",
@@ -401,7 +405,7 @@ export default function App() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [tables, userName, isLoggedIn, isProfileLoaded]);
+  }, [tables]);
 
   // 4. Load linimasa_posts (with nested comments) and listen live
   useEffect(() => {
@@ -568,46 +572,53 @@ export default function App() {
     };
   }, []);
 
-  // Sync player stats to DB
+  // Synchronize player profile and stats to Supabase (Unified & Debounced to prevent race conditions and db spam)
   useEffect(() => {
     if (!isLoggedIn || !userId || !isProfileLoaded) return;
-    const syncStats = async () => {
-      await supabase.from("pengunjung").update({
-        saldo,
-        hunger,
-        thirst,
-        inventory: foodInventory
-      }).eq("id", userId);
+
+    const syncVisitorData = async () => {
+      try {
+        const { error } = await supabase.from("pengunjung").upsert({
+          id: userId,
+          name: userName,
+          status: userStatus,
+          avatar: userAvatar,
+          name_changes: nameChanges,
+          is_online: true,
+          table_id: activeTableId,
+          pin: userPin,
+          saldo: saldo,
+          hunger: hunger,
+          thirst: thirst,
+          inventory: foodInventory,
+          last_active_at: new Date().toISOString()
+        }, { onConflict: 'id' });
+
+        if (error) {
+          console.error("Gagal melakukan sinkronisasi data pengunjung ke Supabase:", error);
+        }
+      } catch (err) {
+        console.error("Kesalahan saat menjalankan sinkronisasi data pengunjung:", err);
+      }
     };
-    // Debounce stat syncing to avoid spamming the DB on rapid updates
-    const timeout = setTimeout(syncStats, 1000);
+
+    const timeout = setTimeout(syncVisitorData, 800);
     return () => clearTimeout(timeout);
-  }, [saldo, hunger, thirst, foodInventory, isLoggedIn, userId, isProfileLoaded]);
-
-  // Register or update our visitor card
-  useEffect(() => {
-    if (!isLoggedIn || !userId || !isProfileLoaded) return;
-
-    const upsertVisitor = async () => {
-      await supabase.from("pengunjung").upsert({
-        id: userId,
-        name: userName,
-        status: userStatus,
-        avatar: userAvatar,
-        name_changes: nameChanges,
-        is_online: true,
-        table_id: activeTableId,
-        pin: userPin,
-        saldo: saldo,
-        hunger: hunger,
-        thirst: thirst,
-        inventory: foodInventory,
-        last_active_at: new Date().toISOString()
-      }, { onConflict: 'id' });
-    };
-
-    upsertVisitor();
-  }, [isLoggedIn, userId, userName, userStatus, userAvatar, activeTableId, userPin, nameChanges, saldo, hunger, thirst, foodInventory, isProfileLoaded]);
+  }, [
+    isLoggedIn,
+    userId,
+    userName,
+    userStatus,
+    userAvatar,
+    activeTableId,
+    userPin,
+    nameChanges,
+    saldo,
+    hunger,
+    thirst,
+    foodInventory,
+    isProfileLoaded
+  ]);
 
   // Separate session-based unload hook to only run on genuine logout or window exit
   useEffect(() => {
