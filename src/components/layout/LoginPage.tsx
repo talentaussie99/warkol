@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Sparkles, Send, Mail, Lock, ArrowRight, RefreshCw } from "lucide-react";
+import { supabase } from "../../lib/supabaseClient";
 
 interface LoginPageProps {
   _t: (id: string, en: string) => string;
@@ -43,7 +44,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
     return cleanNick.slice(0, 15) || "Kang_Kopi";
   };
 
-  const handleFormSubmit = (e: React.FormEvent) => {
+  const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setMessage(null);
 
@@ -59,11 +60,14 @@ export const LoginPage: React.FC<LoginPageProps> = ({
 
     setSimulatedLoading(true);
 
-    setTimeout(() => {
-      setSimulatedLoading(false);
-      
+    try {
       if (authMode === "login") {
-        // Success login
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: email.trim(),
+          password
+        });
+        if (error) throw error;
+        
         const nick = getNicknameFromEmail(email);
         setUserName(nick);
         // Set a random avatar or first preset
@@ -75,15 +79,25 @@ export const LoginPage: React.FC<LoginPageProps> = ({
       } else if (authMode === "register") {
         if (password !== confirmPassword) {
           setMessage({ type: "error", text: _t("Duh, password konfirmasi nya gak cocok kawan!", "Oops, confirmation password doesn't match!") });
+          setSimulatedLoading(false);
           return;
         }
-        // Simulated successful register
+        const { data, error } = await supabase.auth.signUp({
+          email: email.trim(),
+          password
+        });
+        if (error) throw error;
+        
         setMessage({ type: "success", text: _t("Akun berhasil dibuat! Silakan masuk kawan.", "Account created successfully! Please log in.") });
         setAuthMode("login");
         setPassword("");
         setConfirmPassword("");
       } else if (authMode === "forgot") {
-        // Simulated forgot password
+        const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+          redirectTo: window.location.origin
+        });
+        if (error) throw error;
+        
         setMessage({ 
           type: "success", 
           text: _t(
@@ -92,7 +106,12 @@ export const LoginPage: React.FC<LoginPageProps> = ({
           ) 
         });
       }
-    }, 1200);
+    } catch (err: any) {
+      console.error("Auth error:", err);
+      setMessage({ type: "error", text: err.message || _t("Aduh, ada kendala koneksi ke Supabase kawan!", "Oops, some issues connecting to database, friend!") });
+    } finally {
+      setSimulatedLoading(false);
+    }
   };
 
   return (
@@ -166,27 +185,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                 {authMode === "forgot" && _t("Jangan panik, bisa diatur lewat email!", "Don't panic, let's fix it via email!")}
               </p>
             </div>
-
-            {/* QUICK DEMO ENTRY (Only on login tab for fast testing) */}
-            {authMode === "login" && (
-              <div className="p-2 sm:p-2.5 bg-amber-500/10 border border-amber-500/15 rounded-xl backdrop-blur-sm shrink-0">
-                <div className="flex items-center justify-between text-[7.5px] sm:text-[8px] font-bold text-amber-400/90 uppercase font-mono mb-1 px-0.5">
-                  <span className="flex items-center gap-1">⚡ {_t("Langsung Nongkrong:", "Direct Hangout:")}</span>
-                  <span className="bg-[#E9C46A] text-neutral-900 rounded font-bold px-1 py-0.1 select-none text-[6.5px] font-black">FAST</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsLoggedIn(true);
-                    setUserName("Rifki (Demo)");
-                    setUserStatus("☕ Lagi Ngopi");
-                  }}
-                  className="w-full py-1.5 sm:py-2 px-2.5 sm:px-3 rounded-lg text-center text-[9px] sm:text-[10px] font-black text-neutral-950 bg-gradient-to-r from-amber-400 to-[#E9C46A] hover:from-amber-300 hover:to-amber-500 shadow-md transition-all cursor-pointer flex items-center justify-center gap-1 duration-100"
-                >
-                  <span>{_t("Masuk Tanpa Sandi: Rifki (Demo)", "Enter Without Password: Rifki (Demo)")}</span>
-                </button>
-              </div>
-            )}
 
             {/* FORM CONTAINER */}
             <form onSubmit={handleFormSubmit} className="space-y-2.5 sm:space-y-3.5">

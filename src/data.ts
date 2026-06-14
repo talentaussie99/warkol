@@ -3,11 +3,11 @@ import { Meja, TableId, Message, Pengunjung, MenuItem } from "./types";
 export const INITIAL_MEJA_LIST: Meja[] = [
   {
     id: TableId.SANTAI,
-    name: "Obrolan Santai",
+    name: "Obrolan Terbuka Umum",
     icon: "☕",
-    count: 12,
-    topic: "Mending kerja sesuai passion atau gaji besar?",
-    initialTopicDesc: "Ngobrolin dilema hidup sambil nyemprot obat nyamuk bakar."
+    count: 1,
+    topic: "Tempat nongkrong dan ngobrol bebas siapa aja",
+    initialTopicDesc: "Meja obrolan umum pertama yang bisa diakses semuannya."
   }
 ];
 

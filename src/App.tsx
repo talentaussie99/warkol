@@ -50,17 +50,35 @@ import { Timeline } from "./components/features/Timeline";
 import { Notifications } from "./components/features/Notifications";
 import { ChatArea } from "./components/features/ChatArea";
 import ChessBoard from "./components/ChessBoard";
+import { supabase } from "./lib/supabaseClient";
+
+import { TutorialModal } from "./components/modals/TutorialModal";
 
 export default function App() {
   // Application State
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [userName, setUserName] = useState("Kamu (Nongkrong)");
+  const [userPin, setUserPin] = useState<string>(() => {
+    const chars = "0123456789ABCDEF";
+    let pinStr = "";
+    for (let i = 0; i < 8; i++) {
+      pinStr += chars[Math.floor(Math.random() * chars.length)];
+    }
+    return pinStr;
+  });
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [userStatus, setUserStatus] = useState("☕ Lagi Ngopi");
+  const [isEditingStatus, setIsEditingStatus] = useState(false);
+
   const [activeTableId, setActiveTableId] = useState<string>(TableId.SANTAI);
   const [mainView, setMainView] = useState<"chat" | "chess">("chat");
   const [mobileActiveTab, setMobileActiveTab] = useState<"chat" | "rooms" | "menu" | "chess" | "profile">("chat");
   const [dashboardTab, setDashboardTab] = useState<"obrolan" | "linimasa" | "pemberitahuan">("obrolan");
   const [previousTab, setPreviousTab] = useState<"obrolan" | "linimasa">("obrolan");
-  const [chats, setChats] = useState<Record<string, Message[]>>(INITIAL_CHAT);
-  const [tables, setTables] = useState<Meja[]>(INITIAL_MEJA_LIST);
-  const [pengunjung, setPengunjung] = useState(INITIAL_PENGUNJUNG);
+  const [chats, setChats] = useState<Record<string, Message[]>>({});
+  const [tables, setTables] = useState<Meja[]>([]);
+  const [pengunjung, setPengunjung] = useState<any[]>([]);
   const [currentQuoteIndex, setCurrentQuoteIndex] = useState(0);
   const [showBanner, setShowBanner] = useState(true);
 
@@ -76,8 +94,8 @@ export default function App() {
   }[]>([]);
 
   // The Sims-style hunger & thirst states
-  const [hunger, setHunger] = useState<number>(85); // Lapar (0-100)
-  const [thirst, setThirst] = useState<number>(80); // Haus (0-100)
+  const [hunger, setHunger] = useState<number>(100); // Lapar (0-100)
+  const [thirst, setThirst] = useState<number>(100); // Haus (0-100)
   const [foodInventory, setFoodInventory] = useState<(MenuItem & { instanceId: string })[]>([]);
   
   // User profile picture / avatar state (and selector toggling)
@@ -92,6 +110,10 @@ export default function App() {
   
   // Create Room state
   const [showCreateRoomModal, setShowCreateRoomModal] = useState(false);
+
+  // Tutorial state
+  const [showTutorial, setShowTutorial] = useState(false);
+  const [tutorialStep, setTutorialStep] = useState(0);
   const [newRoomName, setNewRoomName] = useState("");
   const [newRoomTopic, setNewRoomTopic] = useState("");
   const [newRoomIcon, setNewRoomIcon] = useState("☕");
@@ -138,8 +160,6 @@ export default function App() {
   const _t = (idText: string, enText: string) => lang === "en" ? enText : idText;
 
   // Login / Join State
-  const [isLoggingIn, setIsLoggingIn] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [showJoinForm, setShowJoinForm] = useState(false);
   const [joinEmail, setJoinEmail] = useState("");
   const [joinPassword, setJoinPassword] = useState("");
@@ -158,6 +178,300 @@ export default function App() {
   const [reportingMessage, setReportingMessage] = useState<Message | null>(null);
   const [selectedReportReason, setSelectedReportReason] = useState<string>("");
   const [reportSuccessFeedback, setReportSuccessFeedback] = useState<boolean>(false);
+
+  // --- SUPABASE REALTIME SYNCHRONIZATION ---
+
+  // 1. Authenticated session listener
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        setIsLoggedIn(true);
+        const email = session.user.email || "";
+        const parts = email.split("@")[0];
+        const nick = parts.replace(/[^a-zA-Z0-9]/g, "_").slice(0, 15) || "Kang_Kopi";
+        setUserName(nick);
+        if (!localStorage.getItem("tutorial_done")) {
+          setShowTutorial(true);
+        }
+      }
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        setIsLoggedIn(true);
+        const email = session.user.email || "";
+        const parts = email.split("@")[0];
+        const nick = parts.replace(/[^a-zA-Z0-9]/g, "_").slice(0, 15) || "Kang_Kopi";
+        setUserName(nick);
+        if (!localStorage.getItem("tutorial_done")) {
+          setShowTutorial(true);
+        }
+      } else {
+        setIsLoggedIn(false);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // 2. Load meja (rooms) and listen live
+  useEffect(() => {
+    const fetchRooms = async () => {
+      const { data, error } = await supabase.from("meja").select("*").order("created_at", { ascending: true });
+      if (!error && data) {
+        const mapped: Meja[] = data.map((d: any) => ({
+          id: d.id,
+          name: d.name,
+          icon: d.icon || "☕",
+          count: d.count || 1,
+          topic: d.topic || "",
+          initialTopicDesc: d.initial_topic_desc || "",
+          creator: d.creator || null,
+          invitedUsers: d.invited_users || [],
+          code: d.code || null
+        }));
+        
+        if (!mapped.some(t => t.id === TableId.SANTAI)) {
+          const defaultMeja = {
+            id: TableId.SANTAI,
+            name: "Obrolan Terbuka Umum",
+            icon: "☕",
+            count: 1,
+            topic: "Tempat nongkrong dan ngobrol bebas siapa aja",
+            initial_topic_desc: "Meja obrolan umum pertama yang bisa diakses semuannya."
+          };
+          await supabase.from("meja").insert(defaultMeja);
+          mapped.unshift({
+            id: defaultMeja.id,
+            name: defaultMeja.name,
+            icon: defaultMeja.icon,
+            count: defaultMeja.count,
+            topic: defaultMeja.topic,
+            initialTopicDesc: defaultMeja.initial_topic_desc,
+            invitedUsers: []
+          });
+        }
+        setTables(mapped);
+      }
+    };
+
+    fetchRooms();
+
+    const channel = supabase
+      .channel("meja-db-live")
+      .on("postgres_changes", { event: "*", schema: "public", table: "meja" }, () => {
+        fetchRooms();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  // 3. Load chats (pesan_chat) and listen live
+  useEffect(() => {
+    if (tables.length === 0) return;
+
+    const fetchMessages = async () => {
+      const { data, error } = await supabase
+        .from("pesan_chat")
+        .select("*")
+        .order("created_at", { ascending: true });
+
+      if (!error && data) {
+        const grouped: Record<string, Message[]> = {};
+        data.forEach((m: any) => {
+          if (!grouped[m.table_id]) grouped[m.table_id] = [];
+          grouped[m.table_id].push({
+            id: m.id,
+            sender: m.sender,
+            text: m.text,
+            role: m.role as any,
+            tag: m.tag,
+            timestamp: m.timestamp,
+            color: m.color,
+            isWithdrawn: m.is_withdrawn
+          });
+        });
+        
+        tables.forEach(t => {
+          if (!grouped[t.id]) grouped[t.id] = [];
+        });
+        setChats(grouped);
+      }
+    };
+
+    fetchMessages();
+
+    const channel = supabase
+      .channel("chats-db-live")
+      .on("postgres_changes", { event: "*", schema: "public", table: "pesan_chat" }, () => {
+        fetchMessages();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [tables]);
+
+  // 4. Load linimasa_posts (with nested comments) and listen live
+  useEffect(() => {
+    const fetchPostsAndComments = async () => {
+      const { data: postsData, error: postsError } = await supabase
+        .from("linimasa_posts")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      const { data: commentsData, error: commentsError } = await supabase
+        .from("linimasa_comments")
+        .select("*")
+        .order("created_at", { ascending: true });
+
+      if (!postsError && postsData) {
+        const commentsGrouped: Record<string, any[]> = {};
+        if (commentsData) {
+          commentsData.forEach((c: any) => {
+            if (!commentsGrouped[c.post_id]) commentsGrouped[c.post_id] = [];
+            commentsGrouped[c.post_id].push({
+              id: c.id,
+              author: c.author,
+              text: c.text,
+              timestamp: c.timestamp
+            });
+          });
+        }
+
+        const mapped: LinimasaPost[] = postsData.map((p: any) => ({
+          id: p.id,
+          author: p.author,
+          avatarColor: p.avatar_color,
+          text: p.text,
+          image: p.image || undefined,
+          timestamp: p.timestamp,
+          createdAt: new Date(p.created_at).getTime(),
+          likes: p.likes || 0,
+          isLikedByUser: p.liked_by?.includes(userName) || false,
+          comments: commentsGrouped[p.id] || []
+        }));
+
+        setLinimasaPosts(mapped);
+      }
+    };
+
+    fetchPostsAndComments();
+
+    const channelPosts = supabase
+      .channel("timeline-db-live")
+      .on("postgres_changes", { event: "*", schema: "public", table: "linimasa_posts" }, () => {
+        fetchPostsAndComments();
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "linimasa_comments" }, () => {
+        fetchPostsAndComments();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channelPosts);
+    };
+  }, [userName]);
+
+  // 5. Load notifications and listen live
+  useEffect(() => {
+    const fetchNotifications = async () => {
+      const { data, error } = await supabase
+        .from("notifications")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (!error && data) {
+        setNotifications(data.map((n: any) => ({
+          id: n.id,
+          type: n.type as any,
+          sender: n.sender,
+          postId: n.post_id,
+          content: n.content,
+          timestamp: n.timestamp,
+          isRead: n.is_read
+        })));
+      }
+    };
+
+    fetchNotifications();
+
+    const channel = supabase
+      .channel("notifications-db-live")
+      .on("postgres_changes", { event: "*", schema: "public", table: "notifications" }, () => {
+        fetchNotifications();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  // 6. Load pengunjung (online status) and register ourselves
+  useEffect(() => {
+    const fetchVisitors = async () => {
+      const { data, error } = await supabase.from("pengunjung").select("*");
+      if (!error && data) {
+        setPengunjung(data.map((p: any) => ({
+          id: p.id,
+          name: p.name,
+          status: p.status,
+          isOnline: p.is_online,
+          table: p.table_id || "santai",
+          pin: p.pin
+        })));
+      }
+    };
+
+    fetchVisitors();
+
+    const channel = supabase
+      .channel("visitors-db-live")
+      .on("postgres_changes", { event: "*", schema: "public", table: "pengunjung" }, () => {
+        fetchVisitors();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  // Register or update our visitor card
+  useEffect(() => {
+    if (!isLoggedIn || !userName) return;
+
+    const upsertVisitor = async () => {
+      await supabase.from("pengunjung").upsert({
+        id: `visitor-${userName}`,
+        name: userName,
+        status: userStatus,
+        is_online: true,
+        table_id: activeTableId,
+        pin: userPin,
+        last_active_at: new Date().toISOString()
+      });
+    };
+
+    upsertVisitor();
+
+    // Mark offline on unmount/unload
+    const handleUnload = async () => {
+      await supabase.from("pengunjung").update({ is_online: false }).eq("id", `visitor-${userName}`);
+    };
+
+    window.addEventListener("beforeunload", handleUnload);
+
+    return () => {
+      window.removeEventListener("beforeunload", handleUnload);
+      handleUnload();
+    };
+  }, [isLoggedIn, userName, userStatus, activeTableId, userPin]);
 
   // Synchronize mainView with mobileActiveTab for chess integration
   useEffect(() => {
@@ -231,109 +545,7 @@ export default function App() {
   };
 
   // Linimasa (Timeline / Social Media Feed) states
-  const [linimasaPosts, setLinimasaPosts] = useState<LinimasaPost[]>([
-    {
-      id: "post-1",
-      author: "Pak Bambang (Demo)",
-      avatarColor: "bg-blue-600",
-      text: "Alhamdulillah catur malam ini menang terus lawan pak RT. Kopi hitam warkol memang mantap bikin otak encer! ♟️☕",
-      image: "https://images.unsplash.com/photo-1529699211952-734e80c4d42b?w=600&auto=format&fit=crop&q=60",
-      timestamp: _t("10 menit yang lalu", "10 mins ago"),
-      createdAt: Date.now() - 10 * 60 * 1000,
-      likes: 5,
-      isLikedByUser: false,
-      comments: [
-        { id: "com-1", author: "Mas Rifki", text: _t("Rematch besok pak, tadi cuma hoki aja hehe", "Rematch tomorrow sir, I was just lucky hehe"), timestamp: _t("8 menit yang lalu", "8 mins ago") },
-        { id: "com-2", author: "Pak Bambang (Demo)", text: _t("Ditunggu di meja santai mas!", "Waiting at the chill table bro!"), timestamp: _t("5 menit yang lalu", "5 mins ago") }
-      ]
-    },
-    {
-      id: "post-2",
-      author: "Mba Siska (Demo)",
-      avatarColor: "bg-pink-600",
-      text: "Nugas di warkop estetik emang beda energinya. Es teh manis jumbo adalah penyelamat deadline! 💻🧊",
-      image: "https://images.unsplash.com/photo-1556679343-c7306c1976bc?w=600&auto=format&fit=crop&q=60",
-      timestamp: _t("1 jam yang lalu", "1 hour ago"),
-      createdAt: Date.now() - 60 * 60 * 1000,
-      likes: 12,
-      isLikedByUser: false,
-      comments: [
-        { id: "com-3", author: "Mas Rifki", text: _t("Pesen roti bakar coklat juga mba biar tambah fokus", "Order chocolate toast too sis, to be more focused"), timestamp: _t("45 menit yang lalu", "45 mins ago") }
-      ]
-    },
-    {
-      id: "post-3",
-      author: "Rizky (Demo)",
-      avatarColor: "bg-[#D4A373]",
-      text: "Malam ini sepi bener, butuh teman ngobrol seru di Meja Curhat. Yuk mampir temen-temen! 🤝☕",
-      image: "https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=600&auto=format&fit=crop&q=60",
-      timestamp: "3 jam yang lalu",
-      createdAt: Date.now() - 3 * 60 * 60 * 1000,
-      likes: 4,
-      isLikedByUser: false,
-      comments: []
-    },
-    {
-      id: "post-4",
-      author: "Kang Bubur (Demo)",
-      avatarColor: "bg-amber-600",
-      text: "Bubur ayam sudah ready kawan. Yang lapar jangan ditahan, langsung merapat ke pojokan! 🥣🐓",
-      image: "https://images.unsplash.com/photo-1626078436897-6950785055b8?w=600&auto=format&fit=crop&q=60",
-      timestamp: "5 jam yang lalu",
-      createdAt: Date.now() - 5 * 60 * 60 * 1000,
-      likes: 8,
-      isLikedByUser: false,
-      comments: []
-    },
-    {
-      id: "post-5",
-      author: "Om Galon (Demo)",
-      avatarColor: "bg-cyan-600",
-      text: "Panas-panas begini emang paling bener minum es jeruk nipis. Segerrr pol! 🍋🧊",
-      image: "https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?w=600&auto=format&fit=crop&q=60",
-      timestamp: "6 jam yang lalu",
-      createdAt: Date.now() - 6 * 60 * 60 * 1000,
-      likes: 15,
-      isLikedByUser: false,
-      comments: []
-    },
-    {
-      id: "post-6",
-      author: "Bang Soto (Demo)",
-      avatarColor: "bg-yellow-600",
-      text: "Soto Betawi pakai emping emang gak ada obatnya. Maknyus! 🥘🍋",
-      image: "https://images.unsplash.com/photo-1541529086526-db283c563270?w=600&auto=format&fit=crop&q=60",
-      timestamp: "1 hari yang lalu",
-      createdAt: Date.now() - 24 * 60 * 60 * 1000,
-      likes: 20,
-      isLikedByUser: false,
-      comments: []
-    },
-    {
-      id: "post-7",
-      author: "Teh Botol (Demo)",
-      avatarColor: "bg-red-600",
-      text: "Apapun makannya, minumnya? Pasti tau lah ya. Dingin makin nikmat! 🥤❄️",
-      image: "https://images.unsplash.com/photo-1622483767028-3f66f32aef97?w=600&auto=format&fit=crop&q=60",
-      timestamp: "1 hari yang lalu",
-      createdAt: Date.now() - 25 * 60 * 60 * 1000,
-      likes: 9,
-      isLikedByUser: false,
-      comments: []
-    },
-    {
-      id: "post-8",
-      author: "Mas Satay (Demo)",
-      avatarColor: "bg-orange-600",
-      text: "Sate kambing bumbu kacang meresap sampai ke hati. Ayo diborong! 🍢🔥",
-      image: "https://images.unsplash.com/photo-1544124499-58912cbddaad?w=600&auto=format&fit=crop&q=60",
-      timestamp: "2 hari yang lalu",
-      createdAt: Date.now() - 48 * 60 * 60 * 1000,
-      likes: 31,
-      isLikedByUser: false,
-      comments: []
-    }
-  ]);
+  const [linimasaPosts, setLinimasaPosts] = useState<LinimasaPost[]>([]);
   const [visiblePostsCount, setVisiblePostsCount] = useState(3);
   const [seeMoreClicks, setSeeMoreClicks] = useState(0);
 
@@ -346,19 +558,6 @@ export default function App() {
   const [confirmingDeletePostId, setConfirmingDeletePostId] = useState<string | null>(null);
   const [newCommentTexts, setNewCommentTexts] = useState<Record<string, string>>({});
   
-  // Avatar & user identity customization
-  const [userName, setUserName] = useState("Kamu (Nongkrong)");
-  const [userPin, setUserPin] = useState<string>(() => {
-    const chars = "0123456789ABCDEF";
-    let pinStr = "";
-    for (let i = 0; i < 8; i++) {
-      pinStr += chars[Math.floor(Math.random() * chars.length)];
-    }
-    return pinStr;
-  });
-  const [isEditingName, setIsEditingName] = useState(false);
-  const [userStatus, setUserStatus] = useState("☕ Lagi Ngopi");
-  const [isEditingStatus, setIsEditingStatus] = useState(false);
   const [secondsActive, setSecondsActive] = useState(0);
   const [virtualBill, setVirtualBill] = useState(0);
   const [virtualPiring, setVirtualPiring] = useState(0); // number of ordered snacks
@@ -381,7 +580,6 @@ export default function App() {
   // Realtime clock
   const [currentTime, setCurrentTime] = useState("");
   const [nongkrongCount, setNongkrongCount] = useState(127);
-  const [autoChatActive, setAutoChatActive] = useState(true);
 
   // Chat scroll container ref
   const chatContainerRef = useRef<HTMLDivElement>(null);
@@ -536,83 +734,8 @@ export default function App() {
     scrollToTop(false);
   }, [chats]);
 
-  // Ambient Background Chatter Generator
-  useEffect(() => {
-    if (!autoChatActive) return;
-
-    const chatInterval = setInterval(() => {
-      // 40% probability every tick to post a background chat to the active table
-      if (Math.random() < 0.45) {
-        // Pick random speaker
-        let speaker = "";
-        const isCustomMeja = !INITIAL_MEJA_LIST.some(t => t.id === activeTableId);
-        const curMejaObj = tables.find(t => t.id === activeTableId);
-
-        if (isCustomMeja && curMejaObj && curMejaObj.invitedUsers && curMejaObj.invitedUsers.length > 0) {
-          // If custom and there are invited users, 65% chance to speak as an invited user!
-          if (Math.random() < 0.65) {
-            const idx = Math.floor(Math.random() * curMejaObj.invitedUsers.length);
-            speaker = curMejaObj.invitedUsers[idx];
-          } else {
-            const randIndex = Math.floor(Math.random() * INDO_NAMES.length);
-            speaker = INDO_NAMES[randIndex];
-          }
-        } else {
-          const randIndex = Math.floor(Math.random() * INDO_NAMES.length);
-          speaker = INDO_NAMES[randIndex];
-        }
-        
-        // Pick dialogue appropriate to active table
-        const generalBanter = [
-          "Bener banget gaaes, sruput dulu kawan kopinya biar lancar mikir.",
-          "Mending santai dulu, urusan besok ya dipikir besok lah kawan.",
-          "Duh, ada-ada aja kelakuan warga di topik ini haduh.",
-          "Ngomong-ngomong, tadi dijalan dapet cerita lucu dari tetangga.",
-          "Setuju sekali kawan, mari dengerin nasihat sepuh.",
-          "Halah mending pesen gorengan anget dulu aja kawan, biar seru pembahasannya.",
-          "Topik ini emang gak ada matinya di warung warkop online kita ya."
-        ];
-        const dialogPool = CHAT_SENSORS_FOR_TABLES[activeTableId as TableId] || generalBanter;
-        const rawText = dialogPool[Math.floor(Math.random() * dialogPool.length)];
-        const text = injectTagIfPossible(rawText, userName, speaker);
-        
-        const now = new Date();
-        const stamp = now.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
-        const color = COLORS[Math.floor(Math.random() * COLORS.length)];
-        const tag = TAGS[Math.floor(Math.random() * TAGS.length)];
-
-        const simMessage: Message = {
-          id: `ambient-${Date.now()}`,
-          sender: speaker,
-          text: text,
-          role: "guest",
-          tag,
-          timestamp: stamp,
-          color
-        };
-
-        setChats(prev => ({
-          ...prev,
-          [activeTableId]: [...prev[activeTableId], simMessage]
-        }));
-
-        // Dynamically update the speaker's status in Right Sidebar to match activity
-        setPengunjung(prevList => {
-          return prevList.map(item => {
-            if (item.name === speaker) {
-              return { ...item, status: `Lagi ngomong: "${text.substring(0, 20)}..."`, isOnline: true };
-            }
-            return item;
-          });
-        });
-      }
-    }, 7000); // loops every 7 seconds
-
-    return () => clearInterval(chatInterval);
-  }, [activeTableId, autoChatActive, userName, tables]);
-
   // Linimasa (Timeline / Social Media Feed) Handlers
-  const handleCreatePost = (e: React.FormEvent) => {
+  const handleCreatePost = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isLoggedIn) {
       ensureAuth(_t("membuat postingan linimasa", "creating a post"));
@@ -629,81 +752,71 @@ export default function App() {
 
     const finalImage = newPostImage || (newPostImageFile ? URL.createObjectURL(newPostImageFile) : undefined);
 
-    const newPost: LinimasaPost = {
-      id: `post-${Date.now()}`,
+    const postId = `post-${Date.now()}`;
+    await supabase.from("linimasa_posts").insert({
+      id: postId,
       author: userName,
-      avatarColor: "bg-[#D4A373]",
+      avatar_color: "bg-[#D4A373]",
       text: newPostText,
       image: finalImage,
       timestamp: _t("Baru saja", "Just now"),
-      createdAt: Date.now(),
       likes: 0,
-      isLikedByUser: false,
-      comments: []
-    };
+      liked_by: []
+    });
 
-    setLinimasaPosts((prev) => [newPost, ...prev]);
     setSaldo(s => s + 1000);
     setNewPostText("");
     setNewPostImage("");
     setNewPostImageFile(null);
   };
 
-  const handleUpdatePost = (postId: string, e: React.FormEvent) => {
+  const handleUpdatePost = async (postId: string, e: React.FormEvent) => {
     e.preventDefault();
     if (!editingPostText.trim()) return;
 
-    setLinimasaPosts((prev) =>
-      prev.map((post) => {
-        if (post.id === postId) {
-          return { ...post, text: editingPostText };
-        }
-        return post;
-      })
-    );
+    await supabase.from("linimasa_posts").update({ text: editingPostText }).eq("id", postId);
     setEditingPostId(null);
     setEditingPostText("");
   };
 
-  const handleLikePost = (postId: string) => {
+  const handleLikePost = async (postId: string) => {
     if (!isLoggedIn) {
       ensureAuth(_t("menyukai postingan", "liking a post"));
       return;
     }
-    setLinimasaPosts((prev) =>
-      prev.map((post) => {
-        if (post.id === postId) {
-          const isLiked = post.isLikedByUser;
-          
-          // Add notification if liked (simulated)
-          if (!isLiked && post.author !== userName) {
-            const newNotif = {
-              id: `notif-like-${Date.now()}`,
-              type: "like" as const,
-              sender: userName,
-              postId: post.id,
-              content: _t("menyukai postinganmu", "liked your post"),
-              timestamp: _t("Baru saja", "Just now"),
-              isRead: false
-            };
-            setNotifications(prevNotif => [newNotif, ...prevNotif]);
-          }
+    const post = linimasaPosts.find(p => p.id === postId);
+    if (!post) return;
 
-          return {
-            ...post,
-            likes: isLiked ? post.likes - 1 : post.likes + 1,
-            isLikedByUser: !isLiked
-          };
-        }
-        return post;
-      })
-    );
+    const isLiked = post.isLikedByUser;
+    const nextLikedBy = isLiked 
+      ? (post.liked_by || []).filter((u: string) => u !== userName)
+      : [...(post.liked_by || []), userName];
+
+    const nextLikes = isLiked ? Math.max(0, post.likes - 1) : post.likes + 1;
+
+    await supabase.from("linimasa_posts").update({
+      likes: nextLikes,
+      liked_by: nextLikedBy
+    }).eq("id", postId);
+
+    if (!isLiked && post.author !== userName) {
+      await supabase.from("notifications").insert({
+        id: `notif-like-${Date.now()}`,
+        type: "like",
+        sender: userName,
+        post_id: postId,
+        content: _t("menyukai postinganmu", "liked your post"),
+        timestamp: _t("Baru saja", "Just now"),
+        is_read: false,
+        recipient: post.author
+      });
+    }
   };
 
-  const handleDeletePost = (postId: string) => {
+  const handleDeletePost = async (postId: string) => {
     if (!isLoggedIn) return;
     if (window.confirm("Apakah kamu yakin ingin menghapus postingan ini, kawan? Cerita ini tidak akan bisa kembali lagi.")) {
-      setLinimasaPosts((prev) => prev.filter((post) => post.id !== postId));
+      await supabase.from("linimasa_posts").delete().eq("id", postId);
     }
   };
 
@@ -714,7 +827,7 @@ export default function App() {
     }
   };
 
-  const handleCreateComment = (postId: string, e: React.FormEvent) => {
+  const handleCreateComment = async (postId: string, e: React.FormEvent) => {
     e.preventDefault();
     if (!isLoggedIn) {
       ensureAuth(_t("menulis komentar", "writing a comment"));
@@ -727,39 +840,30 @@ export default function App() {
     const txt = newCommentTexts[postId]?.trim();
     if (!txt) return;
 
-    setLinimasaPosts((prev) =>
-      prev.map((post) => {
-        if (post.id === postId) {
-          // Add notification if commented (simulated)
-          if (post.author !== userName) {
-            const newNotif = {
-              id: `notif-comm-${Date.now()}`,
-              type: "comment" as const,
-              sender: userName,
-              postId: post.id,
-              content: `${_t("mengomentari:", "commented:")} "${txt}"`,
-              timestamp: _t("Baru saja", "Just now"),
-              isRead: false
-            };
-            setNotifications(prevNotif => [newNotif, ...prevNotif]);
-          }
+    const post = linimasaPosts.find(p => p.id === postId);
+    if (!post) return;
 
-          return {
-            ...post,
-            comments: [
-              ...post.comments,
-              {
-                id: `com-${Date.now()}`,
-                author: userName,
-                text: txt,
-                timestamp: _t("Baru saja", "Just now")
-              }
-            ]
-          };
-        }
-        return post;
-      })
-    );
+    const commentId = `com-${Date.now()}`;
+    await supabase.from("linimasa_comments").insert({
+      id: commentId,
+      post_id: postId,
+      author: userName,
+      text: txt,
+      timestamp: _t("Baru saja", "Just now")
+    });
+
+    if (post.author !== userName) {
+      await supabase.from("notifications").insert({
+        id: `notif-comment-${Date.now()}`,
+        type: "comment",
+        sender: userName,
+        post_id: postId,
+        content: `${_t("mengomentari:", "commented:")} "${txt}"`,
+        timestamp: _t("Baru saja", "Just now"),
+        is_read: false,
+        recipient: post.author
+      });
+    }
 
     setNewCommentTexts((prev) => ({
       ...prev,
@@ -768,7 +872,7 @@ export default function App() {
   };
 
   // Send Message logic
-  const handleSendMessage = (e: React.FormEvent) => {
+  const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!ensureAuth(_t("mengirim pesan obrolan", "sending a chat message"))) return;
     if (hunger <= 10 || thirst <= 10) {
@@ -813,21 +917,21 @@ export default function App() {
     const now = new Date();
     const stamp = now.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
 
-    // Save user's text
-    const userMsg: Message = {
-      id: `user-${Date.now()}`,
+    const originalMsg = newMsgText.trim();
+    setNewMsgText("");
+
+    // Save to Supabase
+    const userMsgId = `user-${Date.now()}`;
+    await supabase.from("pesan_chat").insert({
+      id: userMsgId,
+      table_id: activeTableId,
       sender: userName,
-      text: newMsgText.trim(),
+      text: originalMsg,
       role: "user",
-      tag: userName,
+      tag: "Warga",
       timestamp: stamp,
       color: "text-[#E9C46A] bg-amber-950/70 border-amber-500"
-    };
-
-    setChats(prev => ({
-      ...prev,
-      [activeTableId]: [...(prev[activeTableId] || []), userMsg]
-    }));
+    });
 
     // Decrease Hunger and Thirst slightly since talking is hard work!
     setHunger(prev => Math.max(0, prev - (Math.random() > 0.85 ? 1 : 0)));
@@ -846,11 +950,8 @@ export default function App() {
       setCooldownViolationCount(0);
     }
 
-    const originalMsg = newMsgText.trim();
-    setNewMsgText("");
-
     // Simulate warkop companion response after 1.2 second
-    setTimeout(() => {
+    setTimeout(async () => {
       const randIndex = Math.floor(Math.random() * INDO_NAMES.length);
       const replier = INDO_NAMES[randIndex];
       const replyColor = COLORS[Math.floor(Math.random() * COLORS.length)];
@@ -873,39 +974,24 @@ export default function App() {
       // Inject tag optionally
       const replyText = injectTagIfPossible(rawReplyText, userName, replier);
 
-      const replyMsg: Message = {
+      await supabase.from("pesan_chat").insert({
         id: `reply-${Date.now()}`,
+        table_id: activeTableId,
         sender: replier,
         text: replyText,
         role: "guest",
         tag: replyTag,
         timestamp: now.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }),
         color: replyColor
-      };
-
-      setChats(prev => ({
-        ...prev,
-        [activeTableId]: [...prev[activeTableId], replyMsg]
-      }));
+      });
     }, 1200);
   };
 
-  const handleWithdrawMessage = (msgId: string) => {
+  const handleWithdrawMessage = async (msgId: string) => {
     if (!window.confirm(_t("Apakah kamu yakin ingin menarik pesan ini, kawan? Teman nongkrongmu mungkin sudah membacanya.", "Are you sure you want to withdraw this message, buddy? Your hanging friends might have read it."))) {
       return;
     }
-    setChats(prev => {
-      const updatedChats = { ...prev };
-      Object.keys(updatedChats).forEach(tableId => {
-        updatedChats[tableId] = updatedChats[tableId].map(msg => {
-          if (msg.id === msgId) {
-            return { ...msg, isWithdrawn: true };
-          }
-          return msg;
-        });
-      });
-      return updatedChats;
-    });
+    await supabase.from("pesan_chat").update({ is_withdrawn: true }).eq("id", msgId);
   };
 
   // Order Virtual Drink & Food Logic
@@ -957,7 +1043,7 @@ export default function App() {
     setIncomingChessChallenge(null);
   };
 
-  const handleOrderSajian = (item: MenuItem) => {
+  const handleOrderSajian = async (item: MenuItem) => {
     if (!ensureAuth(_t("memesan menu hidangan", "ordering from the menu"))) return;
 
     const priceInt = parseInt(item.price.replace(/\./g, ""));
@@ -1008,8 +1094,9 @@ export default function App() {
     setFoodInventory(prev => [...prev, newInvItem]);
 
     // 1. Log payment/order statement into chat history
-    const orderLog: Message = {
+    const orderLog = {
       id: `order-${Date.now()}`,
+      table_id: activeTableId,
       sender: "Sistem Warkop",
       text: `🍵 ${userName} memesan virtual [${item.icon} ${item.name}] seharga Rp ${item.price} (Masuk ke Kantong!)`,
       role: "admin",
@@ -1018,37 +1105,7 @@ export default function App() {
       color: "text-amber-300 bg-amber-950/30 border-amber-900"
     };
 
-    setChats(prev => ({
-      ...prev,
-      [activeTableId]: [...prev[activeTableId], orderLog]
-    }));
-
-    // 2. Playful cook character reply
-    setTimeout(() => {
-      const cookReplies = [
-        `Bang Kol: Siap bos! ${item.name} lagi diproses, kuah mendidih segera diluncurkan ke kantongmu!`,
-        `Bang Kol: Sip ${item.name} meluncur hangat. Sudah disimpan di Kantong Makanan (Inventory), silakan dilahap kawan!`,
-        `Mas Gorengan: ${item.name} siap saji! Nikmati sambil dengerin bapak-bapak misuh pas catur kalah. Sudah masuk kantong ya!`,
-        `Bang Kol: Srupuut kawan! Sedap bener, tagihan otomatis saya catat di tiang kayu warung ya hha. Klik di Kantong Makanan buat makan!`
-      ];
-      
-      const randomReply = cookReplies[Math.floor(Math.random() * cookReplies.length)];
-      
-      const responseLog: Message = {
-        id: `cook-${Date.now()}`,
-        sender: "Bang Kol (Pemilik)",
-        text: randomReply,
-        role: "admin",
-        tag: "Penjual",
-        timestamp: now.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }),
-        color: "text-amber-400 bg-amber-950/60 border-amber-800"
-      };
-
-      setChats(prev => ({
-        ...prev,
-        [activeTableId]: [...prev[activeTableId], responseLog]
-      }));
-    }, 1000);
+    await supabase.from("pesan_chat").insert(orderLog);
   };
 
   // Consume Food/Drink from Inventory to fill Laper/Haus
@@ -1069,7 +1126,7 @@ export default function App() {
   };
 
   // Create Custom Warkop Table/Discussion
-  const handleCreateRoom = (e: React.FormEvent) => {
+  const handleCreateRoom = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!ensureAuth(_t("membuat obrolan baru", "creating a new chat room"))) return;
     if (saldo < 35000) {
@@ -1103,23 +1160,24 @@ export default function App() {
 
     const roomCode = Math.floor(1000 + Math.random() * 9000).toString();
 
-    const newRoom: Meja = {
+    const newRoom = {
       id: roomId,
       name: newRoomName.trim(),
       icon: newRoomIcon,
       count: 1,
       topic: newRoomTopic.trim() || `Ngobrol santai seputar ${newRoomName.trim()}`,
-      initialTopicDesc: `Topik obrolan hangat bentukan oleh ${userName} di Warkol.`,
+      initial_topic_desc: `Topik obrolan hangat bentukan oleh ${userName} di Warkol.`,
       creator: userName,
-      invitedUsers: invites,
+      invited_users: invites,
       code: roomCode
     };
 
-    setTables(prev => [...prev, newRoom]);
+    await supabase.from("meja").insert(newRoom);
 
-    const initMsgs: Message[] = [
+    const initMsgs: any[] = [
       {
         id: `init-${Date.now()}`,
+        table_id: roomId,
         sender: "Pak RT",
         text: `Halo kawan-kawan! Selamat datang di meja baru kita: [${newRoomIcon} ${newRoomName.trim()}]. No meja (Kode Cari) adalah: ${roomCode}. Bagikan kode 4 angka ini ke teman kawan biar bisa cari & join di sini! Biaya sewa meja sebesar Rp 35.000 telah dibayar lunas oleh @${userName}! Mari bahas: ${newRoomTopic.trim() || 'mari sruput kopinya dulu!'}`,
         role: "admin",
@@ -1132,6 +1190,7 @@ export default function App() {
     if (newRoomInviteUsername.trim()) {
       initMsgs.push({
         id: `invite-init-${Date.now()}`,
+        table_id: roomId,
         sender: "Sistem Warung",
         text: `📢 Warga @${displayInviteName} langsung diundang ke meja private ini oleh @${userName}! Only invited users can see and join this room.`,
         role: "admin",
@@ -1141,10 +1200,7 @@ export default function App() {
       });
     }
 
-    setChats(prev => ({
-      ...prev,
-      [roomId]: initMsgs
-    }));
+    await supabase.from("pesan_chat").insert(initMsgs);
 
     setActiveTableId(roomId);
     setMainView("chat");
@@ -1157,7 +1213,7 @@ export default function App() {
   };
 
   // Invite user to discussion
-  const handleInviteUser = (tableId: string, usernameToInvite: string) => {
+  const handleInviteUser = async (tableId: string, usernameToInvite: string) => {
     if (!usernameToInvite.trim()) return;
 
     let targetUsername = usernameToInvite.trim();
@@ -1175,70 +1231,57 @@ export default function App() {
     }
 
     // Update the room's invitedUsers list
-    setTables(prev => prev.map(t => {
-      if (t.id === tableId) {
-        const invited = t.invitedUsers || [];
-        if (!invited.includes(targetUsername)) {
-          return {
-            ...t,
-            invitedUsers: [...invited, targetUsername]
-          };
-        }
+    const activeTable = tables.find(t => t.id === tableId);
+    if (activeTable) {
+      const invited = activeTable.invitedUsers || [];
+      if (!invited.includes(targetUsername)) {
+        await supabase
+          .from("meja")
+          .update({ invited_users: [...invited, targetUsername] })
+          .eq("id", tableId);
       }
-      return t;
-    }));
+    }
 
     // Post a lovely system message so the chat log reflects the invite
     const now = new Date();
     const stamp = now.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
 
-    const inviteSysMsg: Message = {
+    await supabase.from("pesan_chat").insert({
       id: `sys-invite-${Date.now()}`,
+      table_id: tableId,
       sender: "Sistem Warung",
       text: `📢 Warga @${displayInviteName} berhasil diundang ke meja ini oleh @${userName}!`,
       role: "admin",
       tag: "Sistem",
       timestamp: stamp,
       color: "text-amber-400 bg-amber-950/45 border-amber-900"
-    };
-
-    setChats(prev => ({
-      ...prev,
-      [tableId]: [...(prev[tableId] || []), inviteSysMsg]
-    }));
+    });
   };
 
-  const handleKickUser = (tableId: string, usernameToKick: string) => {
-    // Remove the user from the invited list
-    setTables(prev => prev.map(t => {
-      if (t.id === tableId) {
-        return {
-          ...t,
-          invitedUsers: (t.invitedUsers || []).filter(u => u !== usernameToKick)
-        };
-      }
-      return t;
-    }));
+  const handleKickUser = async (tableId: string, usernameToKick: string) => {
+    const activeTable = tables.find(t => t.id === tableId);
+    if (activeTable) {
+      await supabase
+        .from("meja")
+        .update({ invited_users: (activeTable.invitedUsers || []).filter((u: string) => u !== usernameToKick) })
+        .eq("id", tableId);
+    }
 
     // Post log message as system
     const stamp = new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
-    const kickSysMsg: Message = {
+    await supabase.from("pesan_chat").insert({
       id: `sys-kick-${Date.now()}`,
+      table_id: tableId,
       sender: "Sistem Warung",
       text: `📢 Warga @${usernameToKick} telah diusir (kick) dari meja ini oleh sang pembuat meja!`,
       role: "admin",
       tag: "Sistem",
       timestamp: stamp,
       color: "text-red-400 bg-red-955/20 border-red-900 border"
-    };
-
-    setChats(prev => ({
-      ...prev,
-      [tableId]: [...(prev[tableId] || []), kickSysMsg]
-    }));
+    });
   };
 
-  const handleJoinTableByCode = (code: string) => {
+  const handleJoinTableByCode = async (code: string) => {
     const trimmedCode = code.trim();
     if (!trimmedCode) return;
 
@@ -1249,43 +1292,29 @@ export default function App() {
       return;
     }
 
-    // Add user to invited users list if not already there
-    setTables(prev => prev.map(t => {
-      if (t.id === foundTable.id) {
-        const invited = t.invitedUsers || [];
-        if (!invited.includes(userName) && t.creator !== userName) {
-          return {
-            ...t,
-            invitedUsers: [...invited, userName]
-          };
-        }
-      }
-      return t;
-    }));
+    const invited = foundTable.invitedUsers || [];
+    if (!invited.includes(userName) && foundTable.creator !== userName) {
+      await supabase
+        .from("meja")
+        .update({ invited_users: [...invited, userName] })
+        .eq("id", foundTable.id);
+    }
 
-    // Post system message in that table's chat
     const stamp = new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
-    const joinSysMsg: Message = {
-      id: `sys-joincode-${Date.now()}`,
-      sender: "Sistem Warung",
-      text: `📢 Warga @${userName} berhasil menemukan dan masuk ke meja ini menggunakan pencarian kode 4 angka! Sapa warganya dulu kawan!`,
-      role: "admin",
-      tag: "Sistem",
-      timestamp: stamp,
-      color: "text-emerald-400 bg-emerald-955/20 border-emerald-900 border"
-    };
-
-    setChats(prev => {
-      const currentMsgs = prev[foundTable.id] || [];
-      const wasAlreadyInvited = foundTable.invitedUsers?.includes(userName) || foundTable.creator === userName;
-      if (wasAlreadyInvited) {
-        return prev;
-      }
-      return {
-        ...prev,
-        [foundTable.id]: [...currentMsgs, joinSysMsg]
-      };
-    });
+    const wasAlreadyInvited = foundTable.invitedUsers?.includes(userName) || foundTable.creator === userName;
+    
+    if (!wasAlreadyInvited) {
+      await supabase.from("pesan_chat").insert({
+        id: `sys-joincode-${Date.now()}`,
+        table_id: foundTable.id,
+        sender: "Sistem Warung",
+        text: `📢 Warga @${userName} berhasil menemukan dan masuk ke meja ini menggunakan pencarian kode 4 angka! Sapa warganya dulu kawan!`,
+        role: "admin",
+        tag: "Sistem",
+        timestamp: stamp,
+        color: "text-emerald-400 bg-emerald-955/20 border-emerald-900 border"
+      });
+    }
 
     // Navigate to and activate the table!
     setActiveTableId(foundTable.id);
@@ -3327,6 +3356,18 @@ export default function App() {
         </div>
       )}
       
+      {/* TUTORIAL MODAL */}
+      {showTutorial && (
+        <TutorialModal
+          step={tutorialStep}
+          onNext={() => setTutorialStep(prev => prev + 1)}
+          onClose={() => {
+            setShowTutorial(false);
+            localStorage.setItem("tutorial_done", "true");
+          }}
+        />
+      )}
+
       {/* 4. FOOTER */}
       {isLoggedIn && (
         <footer className="max-w-[1300px] mx-auto px-4 py-4 border-t border-white/5 text-center flex flex-col gap-1.5 opacity-60 hover:opacity-100 transition-opacity">
