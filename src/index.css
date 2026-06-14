@@ -1,0 +1,143 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Space Mono", "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+}
+
+:root {
+  --bg: #1A1A1A;
+  --card: #232323;
+  --accent: #D4A373;
+  --warm: #E9C46A;
+  --text: #E0E0E0;
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+}
+
+/* Custom scrollbar hiding and design */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
+/* Custom theme-friendly modern scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(212, 163, 115, 0.3);
+  border-radius: 9999px;
+  border: 1.5px solid transparent; /* Gives fine breathing space around the scrollbar thumb */
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(212, 163, 115, 0.65);
+}
+
+/* Firefox compatibility support */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(212, 163, 115, 0.3) rgba(0, 0, 0, 0.2);
+}
+
+.glow-yellow {
+  text-shadow: 0 0 8px rgba(233, 196, 106, 0.4);
+}
+
+.glow-accent {
+  text-shadow: 0 0 8px rgba(212, 163, 115, 0.3);
+}
+
+/* Custom card design with subtle transparent boarders */
+.immersive-card {
+  background: var(--card);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* Active side table highlight */
+.active-table-button {
+  background: rgba(212, 163, 115, 0.15) !important;
+  border-left: 3px solid var(--accent) !important;
+  border-color: var(--accent) !important;
+  color: var(--warm) !important;
+}
+
+/* Wood board grid customization */
+.wooden-board-glass {
+  border: 6px solid #231206;
+  background-color: #2c1a0e;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.6);
+}
+
+/* Blinking text helper for ads */
+.blink-text {
+  animation: blinker 1.5s step-start infinite;
+}
+@keyframes blinker {
+  50% {
+    opacity: 0;
+  }
+}
+
+/* Animations for modal transitions and notifications toast */
+@keyframes slide-up {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes scale-up {
+  from {
+    transform: scale(0.95);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.animate-slide-up {
+  animation: slide-up 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-fade-in {
+  animation: fade-in 0.2s ease-out forwards;
+}
+
+.animate-scale-up {
+  animation: scale-up 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+

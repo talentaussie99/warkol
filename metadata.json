@@ -1,0 +1,8 @@
+{
+  "name": "Remix: Warkol Tester",
+  "description": "Warkol (Warkop Online) - tempat nongkrong digital bapak-bapak: ngobrol santai, main catur virtual di warung kopi Indonesia pinggir jalan malam hari.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
