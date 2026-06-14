@@ -202,7 +202,7 @@ export default function App() {
         const parts = email.split("@")[0];
         const defaultNick = parts.replace(/[^a-zA-Z0-9]/g, "_").slice(0, 15) || "Kang_Kopi";
         
-        // Fetch saved saldo, hunger, thirst, inventory for this user
+        // Fetch saved profile
         let { data, error } = await supabase
           .from("pengunjung")
           .select("name, status, avatar, name_changes, saldo, hunger, thirst, inventory")
@@ -210,28 +210,30 @@ export default function App() {
           .maybeSingle();
         
         if (error) {
-          console.error("Gagal mengambil profil pengunjung (Mungkin kendala RLS):", error);
+          console.warn("Mencoba ambil profil...");
         }
 
         if (!data && !error) {
-           // Fallback attempt migration from old email-based ID
-           const { data: oldData, error: oldError } = await supabase
+           const { data: oldData } = await supabase
              .from("pengunjung")
              .select("name, status, avatar, name_changes, saldo, hunger, thirst, inventory")
              .eq("id", `visitor-${defaultNick}`)
              .maybeSingle();
            if (oldData) data = oldData;
-           if (oldError) console.error("Gagal mengambil profil lama:", oldError);
         }
 
         if (!active) return;
 
         if (data) {
           setUserName(data.name || defaultNick);
-          
           if (data.status) setUserStatus(data.status);
           if (data.avatar) setUserAvatar(data.avatar);
           if (data.name_changes) setNameChanges(data.name_changes);
+          
+          // Use localStorage as source of truth for tutorial if DB col missing
+          if (localStorage.getItem("tutorial_done") === "true") {
+            setTutorialDone(true);
+          }
           
           setSaldo(data.saldo ?? 20000);
           setHunger(data.hunger ?? 100);
@@ -400,7 +402,22 @@ export default function App() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [tables, userName]);
+  }, [tables]);
+
+  // 3. Realtime for Pengunjung (Online Count) - Stable Dedicated Effect
+  useEffect(() => {
+    const channel = supabase
+      .channel("pengunjung-db-live")
+      .on("postgres_changes", { event: "*", schema: "public", table: "pengunjung" }, async () => {
+        const { data } = await supabase.from("pengunjung").select("*").order("created_at", { ascending: false });
+        if (data) setPengunjung(data);
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   // 4. Load linimasa_posts (with nested comments) and listen live
   useEffect(() => {
@@ -640,21 +657,31 @@ export default function App() {
     setNameChanges(updated);
     
     if (userId) {
-      // 1. Update Profile
-      await supabase.from("pengunjung").update({
-        name: newName,
-        name_changes: updated
-      }).eq("id", userId);
+      try {
+        // 1. Update Profile (Crucial for persistence!)
+        await supabase.from("pengunjung").update({
+          name: newName,
+          name_changes: updated
+        }).eq("id", userId);
 
-      // 2. Bulk Rename historical records
-      await supabase.from("pesan_chat").update({ sender: newName }).eq("sender_id", userId);
-      await supabase.from("pesan_chat").update({ sender: newName }).eq("sender", oldName);
-      await supabase.from("linimasa_posts").update({ author: newName }).eq("author_id", userId);
-      await supabase.from("linimasa_posts").update({ author: newName }).eq("author", oldName);
-      await supabase.from("linimasa_comments").update({ author: newName }).eq("author_id", userId);
-      await supabase.from("linimasa_comments").update({ author: newName }).eq("author", oldName);
-      await supabase.from("notifications").update({ sender: newName }).eq("sender_id", userId);
-      await supabase.from("notifications").update({ sender: newName }).eq("sender", oldName);
+        // 2. Chat
+        await supabase.from("pesan_chat").update({ sender: newName }).eq("sender_id", userId);
+        await supabase.from("pesan_chat").update({ sender: newName }).eq("sender", oldName);
+        
+        // Papan Cerita (Posts)
+        await supabase.from("linimasa_posts").update({ author: newName }).eq("author_id", userId);
+        await supabase.from("linimasa_posts").update({ author: newName }).eq("author", oldName);
+        
+        // Comments
+        await supabase.from("linimasa_comments").update({ author: newName }).eq("author_id", userId);
+        await supabase.from("linimasa_comments").update({ author: newName }).eq("author", oldName);
+        
+        // Notifications
+        await supabase.from("notifications").update({ sender: newName }).eq("sender_id", userId);
+        await supabase.from("notifications").update({ sender: newName }).eq("sender", oldName);
+      } catch (err) {
+        console.warn("Gagal melakukan bulk rename sejarah:", err);
+      }
     }
   };
 
@@ -1446,12 +1473,12 @@ export default function App() {
     const orderLog = {
       id: `order-${Date.now()}`,
       table_id: activeTableId,
-      sender: "Sistem Warkop",
+      sender: "Bang Kol",
       text: `🍵 ${userName} memesan virtual [${item.icon} ${item.name}] seharga Rp ${item.price} (Masuk ke Kantong!)`,
       role: "admin",
-      tag: "Kasir",
+      tag: "Pemilik Warkol",
       timestamp: stamp,
-      color: "text-amber-300 bg-amber-950/30 border-amber-900"
+      color: "text-emerald-400 bg-emerald-950/20 border-emerald-900"
     };
 
     await safeInsertPesanChat(orderLog);
@@ -1527,12 +1554,12 @@ export default function App() {
       {
         id: `init-${Date.now()}`,
         table_id: roomId,
-        sender: "Sistem Warung",
+        sender: "Bang Kol",
         text: `Halo kawan-kawan! Selamat datang di meja baru kita: [${newRoomIcon} ${newRoomName.trim()}]. No meja (Kode Cari) adalah: ${roomCode}. Bagikan kode 4 angka ini ke teman kawan biar bisa cari & join di sini! Biaya sewa meja sebesar Rp 35.000 telah dibayar lunas oleh @${userName}! Mari bahas: ${newRoomTopic.trim() || 'mari sruput kopinya dulu!'}`,
         role: "admin",
-        tag: "Sistem",
+        tag: "Pemilik Warkol",
         timestamp: new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }),
-        color: "text-rose-400 bg-rose-950/40 border-rose-800"
+        color: "text-amber-400 bg-amber-950/45 border-amber-900"
       }
     ];
 
@@ -1540,10 +1567,10 @@ export default function App() {
       initMsgs.push({
         id: `invite-init-${Date.now()}`,
         table_id: roomId,
-        sender: "Sistem Warung",
+        sender: "Bang Kol",
         text: `📢 Warga @${displayInviteName} langsung diundang ke meja private ini oleh @${userName}! Only invited users can see and join this room.`,
         role: "admin",
-        tag: "Sistem",
+        tag: "Pemilik Warkol",
         timestamp: new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }),
         color: "text-amber-400 bg-amber-950/45 border-amber-900"
       });
@@ -1598,10 +1625,10 @@ export default function App() {
     await safeInsertPesanChat({
       id: `sys-invite-${Date.now()}`,
       table_id: tableId,
-      sender: "Sistem Warung",
+      sender: "Bang Kol",
       text: `📢 Warga @${displayInviteName} berhasil diundang ke meja ini oleh @${userName}!`,
       role: "admin",
-      tag: "Sistem",
+      tag: "Pemilik Warkol",
       timestamp: stamp,
       color: "text-amber-400 bg-amber-950/45 border-amber-900"
     });
@@ -1621,10 +1648,10 @@ export default function App() {
     await safeInsertPesanChat({
       id: `sys-kick-${Date.now()}`,
       table_id: tableId,
-      sender: "Sistem Warung",
+      sender: "Bang Kol",
       text: `📢 Warga @${usernameToKick} telah diusir (kick) dari meja ini oleh sang pembuat meja!`,
       role: "admin",
-      tag: "Sistem",
+      tag: "Pemilik Warkol",
       timestamp: stamp,
       color: "text-red-400 bg-red-955/20 border-red-900 border"
     });
@@ -1656,10 +1683,10 @@ export default function App() {
       await safeInsertPesanChat({
         id: `sys-joincode-${Date.now()}`,
         table_id: foundTable.id,
-        sender: "Sistem Warung",
+        sender: "Bang Kol",
         text: `📢 Warga @${userName} berhasil menemukan dan masuk ke meja ini menggunakan pencarian kode 4 angka! Sapa warganya dulu kawan!`,
         role: "admin",
-        tag: "Sistem",
+        tag: "Pemilik Warkol",
         timestamp: stamp,
         color: "text-emerald-400 bg-emerald-955/20 border-emerald-900 border"
       });
@@ -3762,6 +3789,14 @@ export default function App() {
             setShowTutorial(false);
             setTutorialDone(true);
             localStorage.setItem("tutorial_done", "true");
+            if (userId) {
+              try {
+                // Safely update tutorial status in DB if column exists, ignore if it fails
+                await supabase.from("pengunjung").update({ tutorial_done: true }).eq("id", userId);
+              } catch (err) {
+                console.warn("Skema tutorial_done belum tersedia di DB, progress disimpan di browser.");
+              }
+            }
           }}
         />
       )}
