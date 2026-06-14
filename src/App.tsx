@@ -60,6 +60,7 @@ export default function App() {
   const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isProfileLoaded, setIsProfileLoaded] = useState(false);
   const [userName, setUserName] = useState("Kamu (Nongkrong)");
   const [nameChanges, setNameChanges] = useState<string[]>([]);
   const [userId, setUserId] = useState<string>("");
@@ -213,40 +214,36 @@ export default function App() {
 
   // 1. Authenticated session listener
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        setIsLoggedIn(true);
-        const email = session.user.email || "";
-        const parts = email.split("@")[0];
-        const nick = parts.replace(/[^a-zA-Z0-9]/g, "_").slice(0, 15) || "Kang_Kopi";
-        setUserName(nick);
-        if (!localStorage.getItem("tutorial_done")) {
-          setShowTutorial(true);
-        }
-      }
-      setIsAuthLoading(false);
-    }).catch(() => {
-      setIsAuthLoading(false);
-    });
+    let active = true;
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (session?.user) {
-        setUserId(session.user.id);
+        if (!active) return;
+        const currentUserId = session.user.id;
+        setUserId(currentUserId);
         setIsLoggedIn(true);
         const email = session.user.email || "";
         const parts = email.split("@")[0];
         const defaultNick = parts.replace(/[^a-zA-Z0-9]/g, "_").slice(0, 15) || "Kang_Kopi";
         
         // Fetch saved saldo, hunger, thirst, inventory for this user
-        // Migrate to session.user.id if needed
-        let fetchId = session.user.id;
-        let { data } = await supabase.from("pengunjung").select("name, status, avatar, name_changes, saldo, hunger, thirst, inventory").eq("id", fetchId).single();
+        let { data, error } = await supabase
+          .from("pengunjung")
+          .select("name, status, avatar, name_changes, saldo, hunger, thirst, inventory")
+          .eq("id", currentUserId)
+          .maybeSingle();
         
         if (!data) {
            // Fallback attempt migration from old email-based ID
-           const { data: oldData } = await supabase.from("pengunjung").select("name, status, avatar, name_changes, saldo, hunger, thirst, inventory").eq("id", `visitor-${defaultNick}`).single();
+           const { data: oldData } = await supabase
+             .from("pengunjung")
+             .select("name, status, avatar, name_changes, saldo, hunger, thirst, inventory")
+             .eq("id", `visitor-${defaultNick}`)
+             .maybeSingle();
            if (oldData) data = oldData;
         }
+
+        if (!active) return;
 
         if (data) {
           if (data.name) setUserName(data.name);
@@ -262,18 +259,31 @@ export default function App() {
           setFoodInventory(data.inventory ?? []);
         } else {
           setUserName(defaultNick);
+          setUserStatus("☕ Lagi Ngopi");
+          setSaldo(20000);
+          setHunger(100);
+          setThirst(100);
+          setFoodInventory([]);
         }
+
+        setIsProfileLoaded(true);
 
         if (!localStorage.getItem("tutorial_done")) {
           setShowTutorial(true);
         }
       } else {
+        if (!active) return;
         setIsLoggedIn(false);
+        setUserId("");
+        setIsProfileLoaded(false);
       }
       setIsAuthLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      active = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   // 2. Load meja (rooms) and listen live
@@ -302,7 +312,10 @@ export default function App() {
             topic: "Tempat nongkrong dan ngobrol bebas siapa aja",
             initial_topic_desc: "Meja obrolan umum pertama yang bisa diakses semuannya."
           };
-          await supabase.from("meja").insert(defaultMeja);
+          const { error: insertRoomError } = await supabase.from("meja").insert(defaultMeja);
+          if (insertRoomError) {
+            console.error("Gagal membuat Meja Obrolan Umum default di database:", insertRoomError);
+          }
           mapped.unshift({
             id: defaultMeja.id,
             name: defaultMeja.name,
@@ -388,7 +401,7 @@ export default function App() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [tables]);
+  }, [tables, userName, isLoggedIn, isProfileLoaded]);
 
   // 4. Load linimasa_posts (with nested comments) and listen live
   useEffect(() => {
@@ -557,7 +570,7 @@ export default function App() {
 
   // Sync player stats to DB
   useEffect(() => {
-    if (!isLoggedIn || !userId) return;
+    if (!isLoggedIn || !userId || !isProfileLoaded) return;
     const syncStats = async () => {
       await supabase.from("pengunjung").update({
         saldo,
@@ -569,11 +582,11 @@ export default function App() {
     // Debounce stat syncing to avoid spamming the DB on rapid updates
     const timeout = setTimeout(syncStats, 1000);
     return () => clearTimeout(timeout);
-  }, [saldo, hunger, thirst, foodInventory, isLoggedIn, userId]);
+  }, [saldo, hunger, thirst, foodInventory, isLoggedIn, userId, isProfileLoaded]);
 
   // Register or update our visitor card
   useEffect(() => {
-    if (!isLoggedIn || !userId) return;
+    if (!isLoggedIn || !userId || !isProfileLoaded) return;
 
     const upsertVisitor = async () => {
       await supabase.from("pengunjung").upsert({
@@ -594,7 +607,7 @@ export default function App() {
     };
 
     upsertVisitor();
-  }, [isLoggedIn, userId, userName, userStatus, userAvatar, activeTableId, userPin, nameChanges, saldo, hunger, thirst, foodInventory]);
+  }, [isLoggedIn, userId, userName, userStatus, userAvatar, activeTableId, userPin, nameChanges, saldo, hunger, thirst, foodInventory, isProfileLoaded]);
 
   // Separate session-based unload hook to only run on genuine logout or window exit
   useEffect(() => {
@@ -1231,7 +1244,10 @@ export default function App() {
       ]
     }));
 
-    await supabase.from("pesan_chat").insert(userMsgObj);
+    const { error: insertError } = await supabase.from("pesan_chat").insert(userMsgObj);
+    if (insertError) {
+      console.error("Gagal menyimpan obrolan ke Supabase:", insertError);
+    }
 
     // Decrease Hunger and Thirst slightly since talking is hard work!
     setHunger(prev => Math.max(0, prev - (Math.random() > 0.85 ? 1 : 0)));
