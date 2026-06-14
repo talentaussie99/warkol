@@ -186,19 +186,22 @@ export default function App() {
 
   // --- SUPABASE REALTIME SYNCHRONIZATION ---
 
-  // Clean up legacy "Mas Gorengan" / "Kang Gorengan" bot entries
+  // Clean up legacy and active bot entries from the database to ensure strictly real users
   useEffect(() => {
-    const cleanLegacyGorengan = async () => {
+    const cleanAllBots = async () => {
       try {
-        await supabase.from("pesan_chat").delete().eq("sender", "Mas Gorengan");
-        await supabase.from("pesan_chat").delete().eq("sender", "Kang Gorengan");
-        await supabase.from("pengunjung").delete().eq("name", "Mas Gorengan");
-        await supabase.from("pengunjung").delete().eq("name", "Kang Gorengan");
+        const botNames = [
+          "Bang Bakso", "Om Galon", "Kang Pecel", "Bang Soto", "Om Lele", "Kang Bubur",
+          "Pak RT", "Mbah Kopi", "Cak Lontong", "Lek Kupat", "Pak RW", "Kang Siomay",
+          "Mas Batagor", "Mpok Jamu", "Bang Ojol", "Mas Gorengan", "Kang Gorengan"
+        ];
+        await supabase.from("pesan_chat").delete().in("sender", botNames);
+        await supabase.from("pengunjung").delete().in("name", botNames);
       } catch (err) {
-        console.error("Error cleaning legacy Gorengan bot from database:", err);
+        console.error("Error cleaning bots from database:", err);
       }
     };
-    cleanLegacyGorengan();
+    cleanAllBots();
   }, []);
 
   // 1. Authenticated session listener
@@ -332,8 +335,15 @@ export default function App() {
         .order("created_at", { ascending: true });
 
       if (!error && data) {
+        const botNames = [
+          "Bang Bakso", "Om Galon", "Kang Pecel", "Bang Soto", "Om Lele", "Kang Bubur",
+          "Pak RT", "Mbah Kopi", "Cak Lontong", "Lek Kupat", "Pak RW", "Kang Siomay",
+          "Mas Batagor", "Mpok Jamu", "Bang Ojol", "Mas Gorengan", "Kang Gorengan"
+        ];
+        const realMessages = data.filter((m: any) => !botNames.includes(m.sender));
+
         const grouped: Record<string, Message[]> = {};
-        data.forEach((m: any) => {
+        realMessages.forEach((m: any) => {
           if (!grouped[m.table_id]) grouped[m.table_id] = [];
           grouped[m.table_id].push({
             id: m.id,
@@ -498,7 +508,13 @@ export default function App() {
     const fetchVisitors = async () => {
       const { data, error } = await supabase.from("pengunjung").select("*");
       if (!error && data) {
-        setPengunjung(data.map((p: any) => ({
+        const botNames = [
+          "Bang Bakso", "Om Galon", "Kang Pecel", "Bang Soto", "Om Lele", "Kang Bubur",
+          "Pak RT", "Mbah Kopi", "Cak Lontong", "Lek Kupat", "Pak RW", "Kang Siomay",
+          "Mas Batagor", "Mpok Jamu", "Bang Ojol", "Mas Gorengan", "Kang Gorengan"
+        ];
+        const realVisitors = data.filter((p: any) => !botNames.includes(p.name));
+        setPengunjung(realVisitors.map((p: any) => ({
           id: p.id,
           name: p.name,
           status: p.status,
@@ -1221,63 +1237,6 @@ export default function App() {
       // Successfully sent without violating, reset violation counters
       setCooldownViolationCount(0);
     }
-
-    // Simulate warkop companion response after 1.2 second
-    setTimeout(async () => {
-      const randIndex = Math.floor(Math.random() * INDO_NAMES.length);
-      const replier = INDO_NAMES[randIndex];
-      const replyColor = COLORS[Math.floor(Math.random() * COLORS.length)];
-      const replyTag = TAGS[Math.floor(Math.random() * TAGS.length)];
-
-      // Standard randomized response
-      let rawReplyText = AUTO_REPLIES[Math.floor(Math.random() * AUTO_REPLIES.length)];
-
-      // Fun easter eggs context analysis (cleaned from double prefix layout)
-      if (originalMsg.toLowerCase().includes("catur")) {
-        rawReplyText = "Woi, dilarang pamer elo catur rendah di sini ya, mending duel lawan saya di Pojok Catur bawah!";
-      } else if (originalMsg.toLowerCase().includes("utang") || originalMsg.toLowerCase().includes("pinjol")) {
-        rawReplyText = "Utang kas bon piring mendoan digantung dulu mas kawan, jangan bikin pusing satu RT.";
-      } else if (originalMsg.toLowerCase().includes("kopi")) {
-        rawReplyText = "Kopi hitam warkop emang gak ada tandingannya kawan, sekali sruput langsung ilang pusing.";
-      } else if (originalMsg.toLowerCase().includes("mie") || originalMsg.toLowerCase().includes("makan")) {
-        rawReplyText = "Paling mantap mie instan rebus dikasih cabe rawit potong kawan, anget nikmat!";
-      }
-
-      // Inject tag optionally
-      const replyText = injectTagIfPossible(rawReplyText, userName, replier);
-      const replyId = `reply-${Date.now()}`;
-      const replyStamp = now.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
-
-      const botMsgObj = {
-        id: replyId,
-        table_id: activeTableId,
-        sender: replier,
-        text: replyText,
-        role: "guest",
-        tag: replyTag,
-        timestamp: replyStamp,
-        color: replyColor
-      };
-
-      setChats(prev => ({
-        ...prev,
-        [activeTableId]: [
-          ...(prev[activeTableId] || []),
-          {
-            id: botMsgObj.id,
-            sender: botMsgObj.sender,
-            text: botMsgObj.text,
-            role: botMsgObj.role as any,
-            tag: botMsgObj.tag,
-            timestamp: botMsgObj.timestamp,
-            color: botMsgObj.color,
-            isWithdrawn: false
-          }
-        ]
-      }));
-
-      await supabase.from("pesan_chat").insert(botMsgObj);
-    }, 1200);
   };
 
   const handleWithdrawMessage = async (msgId: string) => {
@@ -1472,10 +1431,10 @@ export default function App() {
       {
         id: `init-${Date.now()}`,
         table_id: roomId,
-        sender: "Pak RT",
+        sender: "Sistem Warung",
         text: `Halo kawan-kawan! Selamat datang di meja baru kita: [${newRoomIcon} ${newRoomName.trim()}]. No meja (Kode Cari) adalah: ${roomCode}. Bagikan kode 4 angka ini ke teman kawan biar bisa cari & join di sini! Biaya sewa meja sebesar Rp 35.000 telah dibayar lunas oleh @${userName}! Mari bahas: ${newRoomTopic.trim() || 'mari sruput kopinya dulu!'}`,
         role: "admin",
-        tag: "Pak RT",
+        tag: "Sistem",
         timestamp: new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }),
         color: "text-rose-400 bg-rose-950/40 border-rose-800"
       }
