@@ -18,7 +18,6 @@ export const INITIAL_PENGUNJUNG: Pengunjung[] = [
   { id: "4", name: "Bang Soto", status: "Menghitung mangkok pecah", isOnline: true, pin: "3A4B9F8D" },
   { id: "5", name: "Om Lele", status: "Menunggu pesanan mie rebus double", isOnline: true, pin: "1E2D3F4A" },
   { id: "6", name: "Kang Bubur", status: "Skripsi digantung dosen sekte diaduk", isOnline: true, pin: "7F8E0C9D" },
-  { id: "7", name: "Mas Gorengan", status: "Menggoreng tempe kriuk", isOnline: true, pin: "4B1C5D2E" },
   { id: "8", name: "Pak RT", status: "Mencatat warga yang belum ronda", isOnline: true, pin: "8A9B7C1D" },
   { id: "9", name: "Cak Lontong", status: "Lagi bikin tebak-tebakan logika", isOnline: true, pin: "9C0D3E5F" },
   { id: "10", name: "Pak RW", status: "Membaca koran lampu merah", isOnline: false, pin: "6B432C10" }
@@ -162,7 +161,6 @@ export const INDO_NAMES = [
   "Bang Soto",
   "Om Lele",
   "Kang Bubur",
-  "Mas Gorengan",
   "Pak RT",
   "Mbah Kopi",
   "Cak Lontong",

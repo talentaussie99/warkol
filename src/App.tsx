@@ -186,6 +186,21 @@ export default function App() {
 
   // --- SUPABASE REALTIME SYNCHRONIZATION ---
 
+  // Clean up legacy "Mas Gorengan" / "Kang Gorengan" bot entries
+  useEffect(() => {
+    const cleanLegacyGorengan = async () => {
+      try {
+        await supabase.from("pesan_chat").delete().eq("sender", "Mas Gorengan");
+        await supabase.from("pesan_chat").delete().eq("sender", "Kang Gorengan");
+        await supabase.from("pengunjung").delete().eq("name", "Mas Gorengan");
+        await supabase.from("pengunjung").delete().eq("name", "Kang Gorengan");
+      } catch (err) {
+        console.error("Error cleaning legacy Gorengan bot from database:", err);
+      }
+    };
+    cleanLegacyGorengan();
+  }, []);
+
   // 1. Authenticated session listener
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
