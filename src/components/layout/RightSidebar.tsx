@@ -117,7 +117,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
   };
 
   return (
-    <div id="right-column" className={`${mobileActiveTab === "profile" ? "flex" : "hidden"} lg:flex lg:col-span-3 flex-col gap-4 overflow-y-auto warkop-scrollbar pr-1 h-full`}>
+    <div id="right-column" className={`${mobileActiveTab === "profile" ? "flex" : "hidden"} lg:flex lg:col-span-3 flex-col gap-4 overflow-y-auto warkop-scrollbar pr-1 h-full overflow-x-hidden`}>
       {/* 1. USER PROFILE CARD */}
       {isLoggedIn && (
         <div id="user-profile-card" className="immersive-card p-3.5 bg-gradient-to-br from-[#241F1A] to-[#1C1713] border border-amber-900/40 rounded-xl">
@@ -145,22 +145,24 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
             <div className="flex flex-col gap-2.5 bg-[#2d2722]/40 p-2.5 rounded-xl border border-amber-950/20">
               <div className="flex items-center gap-3">
                 <div className="relative group flex-shrink-0" title="Klik untuk ubah foto profil">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    id="avatar-upload"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (!file) return;
-                      const reader = new FileReader();
-                      reader.onloadend = () => {
-                        handleUpdateAvatar(reader.result as string);
-                      };
-                      reader.readAsDataURL(file);
-                    }}
-                  />
-                  <label htmlFor="avatar-upload" className="cursor-pointer block">
+                  <label htmlFor="avatar-upload" className="cursor-pointer block relative flex-shrink-0" title="Klik untuk ubah foto profil">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      id="avatar-upload"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        const reader = new FileReader();
+                        reader.onloadend = () => {
+                          handleUpdateAvatar(reader.result as string);
+                        };
+                        reader.readAsDataURL(file);
+                        // Reset input to allow selecting same file again
+                        e.target.value = '';
+                      }}
+                    />
                     {renderUserAvatar(userAvatar, "w-11 h-11", "transition-transform duration-150 group-hover:scale-105 border border-amber-700/50 shadow-lg")}
                     <div className="absolute inset-0 bg-black/45 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-[8px] text-[#E9C46A] font-bold">
                       {_t("Ubah", "Edit")}

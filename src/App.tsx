@@ -104,7 +104,7 @@ export default function App() {
   const [thirst, setThirst] = useState<number>(100); // Haus (0-100)
   const [foodInventory, setFoodInventory] = useState<(MenuItem & { instanceId: string })[]>([]);
   
-  const [userAvatar, setUserAvatar] = useState<string>("https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&h=150&q=80");
+  const [userAvatar, setUserAvatar] = useState<string>(() => localStorage.getItem("user_avatar") || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&h=150&q=80");
   
   // Order frequency limiting & cooldown state
   const [orderHistory, setOrderHistory] = useState<number[]>([]);
@@ -539,6 +539,7 @@ export default function App() {
 
   const handleUpdateAvatar = async (base64Avatar: string) => {
     setUserAvatar(base64Avatar);
+    localStorage.setItem("user_avatar", base64Avatar);
     if (userId) {
       await supabase.from("pengunjung").update({ avatar: base64Avatar }).eq("id", userId);
     }
@@ -1061,9 +1062,10 @@ export default function App() {
   };
 
   // Order Virtual Drink & Food Logic
-  const handleChessWin = () => {
-    setSaldo(s => s + 5000);
-    alert(_t("🏆 Menang Catur! Kamu dapet Rp 5.000 dari Om Galon hhe.", "🏆 Chess Win! You got Rp 5.000 from the match."));
+  const handleChessWin = (opponentType: "bot" | "user") => {
+    const reward = opponentType === "bot" ? 2000 : 5000;
+    setSaldo(s => s + reward);
+    alert(_t(`🏆 Menang Catur! Kamu dapet Rp ${reward.toLocaleString("id-ID")}.`, `🏆 Chess Win! You got Rp ${reward.toLocaleString("id-ID")}.`));
   };
 
   const handleAcceptChessChallenge = () => {
@@ -1690,7 +1692,7 @@ export default function App() {
             )}
           </div>
 
-          {/* MENU POJOK CATUR BAPAK-BAPAK */}
+          {/* MENU CATUR WARKOL */}
           <div 
             id="menu-pojok-catur" 
             onClick={() => {
@@ -2654,7 +2656,7 @@ export default function App() {
                 <div className="flex items-center gap-2.5">
                   <span className="text-xl select-none">♟️</span>
                   <div>
-                    <h2 className="text-xs font-bold text-[#E9C46A] tracking-wider uppercase">{_t("POJOK CATUR BAPAK-BAPAK", "DAD'S CHESS CORNER")}</h2>
+                    <h2 className="text-xs font-bold text-[#E9C46A] tracking-wider uppercase">{_t("CATUR WARKOL", "WARKOL CHESS")}</h2>
                     <p className="text-[10px] text-zinc-400 font-mono leading-none mt-0.5">{_t("Asah Otak vs Om Galon, Pak RT, atur papan catur tetap kokoh kok!", "Train your brain vs Bot. The chessboard is steady!")}</p>
                   </div>
                 </div>
@@ -2673,7 +2675,7 @@ export default function App() {
                   userPin={userPin} 
                   pengunjung={pengunjung} 
                   disabled={hunger <= 10 || thirst <= 10} 
-                  onWin={handleChessWin} 
+                  onWin={(type) => handleChessWin(type)} 
                   acceptedChallengeOpponent={acceptedChessChallenge}
                   onClearChallenge={() => setAcceptedChessChallenge(null)}
                 />

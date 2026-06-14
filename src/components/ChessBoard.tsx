@@ -137,7 +137,7 @@ interface ChessBoardProps {
   userPin?: string;
   pengunjung?: any[];
   disabled?: boolean;
-  onWin?: () => void;
+  onWin?: (opponentType: "bot" | "user") => void;
   acceptedChallengeOpponent?: {
     name: string;
     pin: string;
@@ -582,7 +582,7 @@ export default function ChessBoard({
               } else if (game.isGameOver()) {
                 if (game.isCheckmate()) {
                   setBanter(activeBot.banters.checkmate);
-                  if (onWin) onWin();
+                  if (onWin) onWin("bot");
                 } else {
                   setBanter("Cak Lontong: Seri! Sama-sama kuat kayak pilar warung warkop.");
                 }
@@ -765,12 +765,7 @@ export default function ChessBoard({
             >
               🤖 Bot Warkop
             </button>
-            <button
-              onClick={() => { setGameMode("LATIHAN"); handleReset(); setShowOpponentSelector(false); }}
-              className={`py-1 text-[10px] font-bold rounded border transition ${gameMode === "LATIHAN" ? "bg-amber-950/40 text-amber-300 border-amber-800" : "bg-white/5 text-white/50 border-transparent"}`}
-            >
-              🪵 Mandiri (Solo)
-            </button>
+            {/* Solo removed */}
             <button
               onClick={() => { setGameMode("MULTIPLAYER"); }}
               className={`py-1 text-[10px] font-bold rounded border transition ${gameMode === "MULTIPLAYER" ? "bg-amber-950/40 text-amber-300 border-amber-800" : "bg-white/5 text-white/50 border-transparent"}`}
