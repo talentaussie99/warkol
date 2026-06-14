@@ -379,10 +379,10 @@ export default function App() {
             sender: m.sender,
             text: m.text,
             role: m.role as any,
-            tag: m.tag,
-            timestamp: m.timestamp,
-            color: m.color,
-            isWithdrawn: m.is_withdrawn
+            tag: m.tag || (m.role === "admin" ? "Suhu" : "Warga"),
+            timestamp: m.timestamp || (m.created_at ? new Date(m.created_at).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) : new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })),
+            color: m.color || (m.role === "admin" ? "text-amber-300 bg-amber-950/60 border-amber-500/40" : "text-[#E9C46A] bg-amber-950/70 border-amber-500"),
+            isWithdrawn: m.is_withdrawn || false
           });
         });
         
@@ -771,6 +771,27 @@ export default function App() {
       return false;
     }
     return true;
+  };
+
+  const safeInsertPesanChat = async (messages: any | any[]) => {
+    const list = Array.isArray(messages) ? messages : [messages];
+    for (const msg of list) {
+      const { error: insertError } = await supabase.from("pesan_chat").insert(msg);
+      if (insertError) {
+        console.warn("Gagal menyimpan obrolan penuh ke Supabase, mencoba skema dasar:", insertError.message);
+        const baseMsgObj = {
+          id: msg.id,
+          table_id: msg.table_id,
+          sender: msg.sender,
+          text: msg.text,
+          role: msg.role
+        };
+        const { error: fallbackError } = await supabase.from("pesan_chat").insert(baseMsgObj);
+        if (fallbackError) {
+          console.error("Gagal menyimpan obrolan dasar ke Supabase:", fallbackError);
+        }
+      }
+    }
   };
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -1255,10 +1276,7 @@ export default function App() {
       ]
     }));
 
-    const { error: insertError } = await supabase.from("pesan_chat").insert(userMsgObj);
-    if (insertError) {
-      console.error("Gagal menyimpan obrolan ke Supabase:", insertError);
-    }
+    await safeInsertPesanChat(userMsgObj);
 
     // Decrease Hunger and Thirst slightly since talking is hard work!
     setHunger(prev => Math.max(0, prev - (Math.random() > 0.85 ? 1 : 0)));
@@ -1397,7 +1415,7 @@ export default function App() {
       color: "text-amber-300 bg-amber-950/30 border-amber-900"
     };
 
-    await supabase.from("pesan_chat").insert(orderLog);
+    await safeInsertPesanChat(orderLog);
   };
 
   // Consume Food/Drink from Inventory to fill Laper/Haus
@@ -1492,7 +1510,7 @@ export default function App() {
       });
     }
 
-    await supabase.from("pesan_chat").insert(initMsgs);
+    await safeInsertPesanChat(initMsgs);
 
     setActiveTableId(roomId);
     setMainView("chat");
@@ -1538,7 +1556,7 @@ export default function App() {
     const now = new Date();
     const stamp = now.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
 
-    await supabase.from("pesan_chat").insert({
+    await safeInsertPesanChat({
       id: `sys-invite-${Date.now()}`,
       table_id: tableId,
       sender: "Sistem Warung",
@@ -1561,7 +1579,7 @@ export default function App() {
 
     // Post log message as system
     const stamp = new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
-    await supabase.from("pesan_chat").insert({
+    await safeInsertPesanChat({
       id: `sys-kick-${Date.now()}`,
       table_id: tableId,
       sender: "Sistem Warung",
@@ -1596,7 +1614,7 @@ export default function App() {
     const wasAlreadyInvited = foundTable.invitedUsers?.includes(userName) || foundTable.creator === userName;
     
     if (!wasAlreadyInvited) {
-      await supabase.from("pesan_chat").insert({
+      await safeInsertPesanChat({
         id: `sys-joincode-${Date.now()}`,
         table_id: foundTable.id,
         sender: "Sistem Warung",
