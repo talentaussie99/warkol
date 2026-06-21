@@ -1050,14 +1050,29 @@ export default function App() {
     return () => clearInterval(timer);
   }, []);
 
-  // 10. INTERVALS FOR DECAY & REWARDS
+  // 10. INTERVALS FOR DECAY & REWARDS (5K per 15M, 15K per 30M)
+  const [minutesOnline, setMinutesOnline] = useState<number>(0);
+
   useEffect(() => {
+    if (!isLoggedIn) return;
+
     const timer = setInterval(() => {
-      // 30 min reward check
-      setSaldo(s => s + 3000);
-    }, 30 * 60 * 1000);
+      setMinutesOnline(prev => {
+        const next = prev + 1;
+        // Check milestone rewards: 30 minutes gets 15,000, 15 minutes (or odd multiples of 15) gets 5,000
+        if (next % 30 === 0) {
+          setSaldo(s => s + 15000);
+          alert(`🎉 Gaji Nongkrong! Kamu telah online selama ${next} menit di Warkop dan mendapatkan dana segar Rp15.000!`);
+        } else if (next % 15 === 0) {
+          setSaldo(s => s + 5000);
+          alert(`🎉 Gaji Nongkrong! Kamu telah online selama ${next} menit di Warkop dan mendapatkan dana segar Rp5.000!`);
+        }
+        return next;
+      });
+    }, 60000); // Ticks every 1 minute
+
     return () => clearInterval(timer);
-  }, []);
+  }, [isLoggedIn]);
 
   useEffect(() => {
     if (!isLoggedIn) return;
@@ -1067,14 +1082,14 @@ export default function App() {
       setLinimasaPosts((prev) => prev.filter(post => Date.now() - (post.createdAt || 0) < 24 * 60 * 60 * 1000));
 
       setHunger((prev) => {
-        const next = prev - (Math.random() > 0.5 ? 1 : 0);
+        const next = prev - (Math.random() > 0.75 ? 1 : 0);
         return next < 0 ? 0 : next;
       });
       setThirst((prev) => {
-        const next = prev - (Math.random() > 0.5 ? 1 : 0);
+        const next = prev - (Math.random() > 0.75 ? 1 : 0);
         return next < 0 ? 0 : next;
       });
-    }, 28000); // Decays very slowly every 28 seconds
+    }, 60000); // Decays even slower: every 60 seconds
 
     return () => clearInterval(interval);
   }, [isLoggedIn]);
@@ -1485,9 +1500,9 @@ export default function App() {
 
     await safeInsertPesanChat(userMsgObj);
 
-    // Decrease Hunger and Thirst slightly since talking is hard work!
-    setHunger(prev => Math.max(0, prev - (Math.random() > 0.85 ? 1 : 0)));
-    setThirst(prev => Math.max(0, prev - (Math.random() > 0.8 ? 1 : 0)));
+    // Decrease Hunger and Thirst slightly since talking is hard work! (Much slower now)
+    setHunger(prev => Math.max(0, prev - (Math.random() > 0.975 ? 1 : 0)));
+    setThirst(prev => Math.max(0, prev - (Math.random() > 0.975 ? 1 : 0)));
 
     setUserStatus("💬 Lagi Ngobrol");
 
@@ -2004,9 +2019,7 @@ export default function App() {
       ) : (
         <>
           {/* NORMAL LOGGED IN 3_COLUMN LAYOUT */}
-          <main className={`max-w-[1300px] w-full mx-auto px-4 mt-4 mb-24 pb-8 lg:mb-20 lg:pb-0 grid grid-cols-1 lg:grid-cols-12 gap-4 transition-all duration-1000 ${
-              (hunger < 10 || thirst < 10) ? "blur-[2px] grayscale-[0.3] brightness-75 pointer-events-none" : ""
-            }`}>
+          <main className="max-w-[1300px] w-full mx-auto px-4 mt-4 mb-24 pb-8 lg:mb-20 lg:pb-0 grid grid-cols-1 lg:grid-cols-12 gap-4 transition-all duration-1000">
         
         {/* LEFT COLUMN: MENU & DIRECTORY (3 cols) */}
         <div id="meja-directory" className={`lg:col-span-3 flex flex-col gap-3 ${mobileActiveTab === "rooms" || mobileActiveTab === "menu" ? "flex" : "hidden lg:flex"}`}>
@@ -3269,7 +3282,7 @@ export default function App() {
                   userName={userName} 
                   userPin={userPin} 
                   pengunjung={pengunjung} 
-                  disabled={hunger <= 10 || thirst <= 10} 
+                  disabled={false} 
                   onWin={(type) => handleChessWin(type)} 
                   onChallengeSent={handleOnChallengeSent}
                   acceptedChallengeOpponent={acceptedChessChallenge}
@@ -3484,7 +3497,7 @@ export default function App() {
                     { icon: "♟️", title: _t("Pojok Catur", "Chess Corner"), desc: _t("Tantang duel catur live vs warga lain atau bot.", "Live chess duel vs others or bots.") },
                     { icon: "🛍️", title: _t("Sajian Hidangan", "Warkol Menu"), desc: _t("Beli kopi, gorengan, dsb untuk isi Lapar & Haus.", "Purchase snacks and coffee to refill stats.") },
                     { icon: "🚩", title: _t("Laporkan Pesan", "Report Message"), desc: _t("Fitur lapor otomatis untuk obrolan gak santai.", "Auto-hidden reported messages.") },
-                    { icon: "💳", title: _t("Sistem Saldo", "Balance System"), desc: _t("Dapat kucuran dana tiap 30 menit online.", "Get funds every 30 minutes online.") }
+                    { icon: "💳", title: _t("Sistem Saldo", "Balance System"), desc: _t("Dapat dana Rp15.000 tiap 30 menit & Rp5.000 tiap 15 menit online.", "Get Rp15,000 every 30 minutes & Rp5,000 every 15 minutes online.") }
                    ].map((f, i) => (
                     <div key={i} className="p-2 bg-white/5 border border-white/5 rounded-lg flex items-start gap-2.5">
                       <span className="text-lg">{f.icon}</span>
@@ -3547,7 +3560,7 @@ export default function App() {
                         {_t("Dapatkan cuan nongkrong dengan rajin beraktivitas:", "Get some hangout cash by being active:")}
                       </p>
                       <ul className="list-disc list-inside text-[9.5px] text-stone-400 space-y-0.5 ml-4 font-mono">
-                        <li>{_t("🎁 + Rp 3.000 Tip tiap 30 menit online (gaji nongkrong).", "🎁 + Rp 3.000 Tip every 30 minutes online.")}</li>
+                        <li>{_t("🎁 + Rp15.000 tiap 30 menit & Rp5.000 tiap 15 menit online (gaji nongkrong).", "🎁 + Rp15,000 every 30 mins & Rp5,000 every 15 mins online.")}</li>
                         <li>{_t("📝 + Rp 1.000 Tiap kali kirim status di Papan Cerita.", "📝 + Rp 1.000 Every time you post on Story Board.")}</li>
                         <li>{_t("🏁 + Rp 5.000 Kalo menang main Catur Bapak.", "🏁 + Rp 5.000 If you win a Chess game.")}</li>
                       </ul>
@@ -3578,8 +3591,8 @@ export default function App() {
                         💀 <span>{_t("Kalo Gak Makan/Minum?", "If you don't eat/drink?")}</span>
                       </h5>
                       <p className="text-[9.5px] text-stone-400 italic leading-snug">
-                        {_t("Kalo statistik lapar/haus kamu di bawah 10%, pandangan kamu bakal mulai burem (Blur) dan layar jadi grayscale. Kamu gak bisa ngobrol/nongkrong sampe perut keisi lagi!",
-                           "If your stats go below 10%, your vision will blur and the screen turns grayscale. You won't be able to chat or hang out until you eat again!")}
+                        {_t("Kalo statistik lapar/haus kamu di bawah 10%, kamu gak akan bisa chat/mengirim pesan obrolan, tapi tetap bisa bermain catur bapak untuk cari koin tambahan!",
+                           "If your stats go below 10%, you won't be able to chat, but you can still play chess to earn some coins!")}
                       </p>
                     </div>
                   </div>
@@ -3854,7 +3867,7 @@ export default function App() {
 
                     {saldo < 35000 ? (
                       <div className="text-[9.5px] text-red-355 bg-red-950/45 p-2 rounded-md border border-red-500/10 font-sans leading-relaxed select-none font-medium">
-                        ⚠️ <strong>Saldo tidak cukup kawan!</strong> Kurang Rp {(35000 - saldo).toLocaleString('id-ID')}. Nongkronglah lebih lama biar dapat kucuran dana koin reguler tiap 30 menit, menangkan pertarungan catur bapak-bapak vs bot, atau posting cerita seru di Papan Cerita untuk dapat cuan tambahan!
+                        ⚠️ <strong>Saldo tidak cukup kawan!</strong> Kurang Rp {(35000 - saldo).toLocaleString('id-ID')}. Nongkronglah lebih lama biar dapat kucuran dana koin reguler tiap 15/30 menit, menangkan pertarungan catur bapak-bapak vs bot, atau posting cerita seru di Papan Cerita untuk dapat cuan tambahan!
                       </div>
                     ) : (
                       <div className="text-[9.5px] text-emerald-355 bg-emerald-950/45 p-2 rounded-md border border-emerald-500/10 font-sans leading-relaxed select-none font-medium">
